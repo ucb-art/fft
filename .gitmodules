@@ -1,0 +1,3 @@
+[submodule "dsp-framework"]
+	path = dsp-framework
+	url = git@github.com:ucb-art/dsp-framework.git
