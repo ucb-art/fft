@@ -10,7 +10,6 @@ import dsptools.{DspContext, DspTester, Grow}
 import org.scalatest.{FlatSpec, Matchers}
 import dsptools.numbers.implicits._
 import dsptools.numbers.{DspComplex, Real}
-import dsptools.examples.Butterfly
 //import scala.util.Random.{nextInt}
 
 class ButterflyTester[T<:Data:Real](c: Butterfly[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
