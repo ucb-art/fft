@@ -6,16 +6,33 @@ import dsptools.numbers.{DspComplex, Real}
 import dsptools.numbers.implicits._
 import scala.math._
 
+object FFTFunctions {
+
+  // bit reverse a value
+  def bit_reverse(in: Int, width: Int): Int = {
+    var test = in
+    var out = 0
+    for (i <- 0 until width) {
+      if (test / pow(2, width-i-1) >= 1) {
+        out += pow(2,i).toInt
+        test -= pow(2,width-i-1).toInt
+      }
+    }
+    out
+  }
+
+}
+
 case class FFTConfig(n: Int = 8, // n-point FFT
                      p: Int = 8, // parallelism, or number of parallel inputs
                      pipelineDepth: Int = 0,
                      real: Boolean = false // real inputs?
                     ) {
   assert(n >= 4, "For an n-point FFT, n must be 4 or more")
-  assert(n%2 == 0, "For an n-point FFT, n must be a power of 2")
+  assert(isPow2(n), "For an n-point FFT, n must be a power of 2")
   assert(pipelineDepth >= 0, "Cannot have negative pipelining, you silly goose.")
   assert(p <= n, "An n-point FFT cannot have more than n inputs (p must be less than or equal to n)")
-  assert(p%2 == 0, "FFT parallelism must be a power of 2")
+  assert(isPow2(p), "FFT parallelism must be a power of 2")
 
   // bp stands for biplex points, so the biplex FFT is a bp-point FFT
   val bp = n/p
@@ -51,29 +68,27 @@ object Butterfly {
   {
     require(in.length == 2, "Butterfly requires two data inputs")   
     val product = in(1)*twiddle
-    List(in(0)+product, in(0)-product) 
+    List(in(0)+product, in(0)-product)
   }
 }
 
 // shift register implemented as an SRAM memory with internal counter
 object ShiftRegisterMem {
 
-  // When using single-ported SRAMs, you have the option of using
+  // use_sp_mem = use single port SRAMs?
+  // use_two_srams = When using single-ported SRAMs, you have the option of using
   //   two SRAMs with type "in" and depth "n", or one SRAM with
   //   inputs twice the width of "in" and depth "n/2". I assume you
   //   want only 1 SRAM by default.
-  var use_two_srams = false
 
-  // use_sp_mem = use single port SRAMs?
-  def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true), use_sp_mem: Boolean = false, name: String = null): T =
+  def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true), use_sp_mem: Boolean = false, use_two_srams: Boolean = false, name: String = null): T =
   {
-    if (n%2 == 1 && use_sp_mem) {
-      println("Creating a ShiftRegisterMem with an odd shift amount will use two SRAMs instead of one.")
-      use_two_srams = true
+    if (n%2 == 1 && use_sp_mem && !use_two_srams) {
+      println("Warning: Creating a ShiftRegisterMem with an odd shift amount will use two SRAMs instead of one.")
     }
     if (use_sp_mem) {
       val out = in.cloneType
-      if (use_two_srams) {
+      if (use_two_srams || n%2 == 1) {
         val sram0 = SeqMem(n, in.cloneType)
         val sram1 = SeqMem(n, in.cloneType)
         if (name != null) {
@@ -91,19 +106,12 @@ object ShiftRegisterMem {
           when (sram_num) {
             sram1(reg_waddr) := in
             reg_raddr0 := index_counter
+          } .otherwise {
+            sram0(reg_waddr) := in
+            reg_raddr1 := index_counter
           }
-            .otherwise {
-              sram0(reg_waddr) := in
-              reg_raddr1 := index_counter
-            }
         }
-        // in case Mux doesn't work
-        when (sram_num) {
-          out := sram0(reg_raddr0)
-        }
-          .otherwise {
-            out := sram1(reg_raddr1)
-          }
+        out := Mux(sram_num, sram0(reg_raddr0), sram1(reg_raddr1))
         out
       }
       else {
@@ -120,20 +128,18 @@ object ShiftRegisterMem {
         when (en) {
           when (index_counter(0)) {
             sram(reg_waddr) := Vec(des, in)
+          } .otherwise {
+            des := in
+            reg_raddr := Mux(index_counter === UInt(n-2), UInt(0), (index_counter >> UInt(1)) + UInt(1))
           }
-            .otherwise {
-              des := in
-              reg_raddr := Mux(index_counter === UInt(n-2), UInt(0), (index_counter >> UInt(1)) + UInt(1))
-            }
         }
         when (index_counter(0)) {
           out := ser
+        } .otherwise {
+          val sram_out = sram(reg_raddr)
+          ser := sram_out(1)
+          out := sram_out(0)
         }
-          .otherwise {
-            val sram_out = sram(reg_raddr)
-            ser := sram_out(1)
-            out := sram_out(0)
-          }
         out
       }
     }
