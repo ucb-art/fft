@@ -23,6 +23,9 @@ libraryDependencies += "org.spire-math" %% "spire" % "0.11.0"
 
 libraryDependencies += "org.scalanlp" %% "breeze" % "0.12"
 
+libraryDependencies += "co.theasi" %% "plotly" % "0.2.0"
+
+
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "2.2.5",
   "org.scalacheck" %% "scalacheck" % "1.12.4")

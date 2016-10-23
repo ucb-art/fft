@@ -44,7 +44,6 @@ class DirectFFTControl[T<:Data:Real](genTwiddle: => DspComplex[T], val config: F
     p = p/2
   }
   indices = temp.flatten
-  println(indices.deep.mkString("\n"))
 
   // wire up twiddles
   val twiddle_rom = Vec(twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))
@@ -56,7 +55,7 @@ class DirectFFTControl[T<:Data:Real](genTwiddle: => DspComplex[T], val config: F
     io.twiddle := (0 until config.p-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.wire(twiddle_rom(0).imaginary, -twiddle_rom(0).real), twiddle_rom(0)))
   } else {
     io.twiddle := (0 until config.p-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), 
-      DspComplex.wire(twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4-1), 0)).imaginary, -twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4-1), 0)).real), 
+      DspComplex.wire(twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4)-1, 0)).imaginary, -twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4)-1, 0)).real), 
       twiddle_rom(indices_rom(start+UInt(x)))))
   }
 
