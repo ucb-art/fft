@@ -28,13 +28,13 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
 
   val io = new DirectFFTIO(genIn, genOut, genTwiddle, config)
 
-  // N-point decimation-in-time FFT with inputs in normal order (outputs bit reversed)
+  // p-point decimation-in-time direct form FFT with inputs in normal order (outputs bit reversed)
   // TODO: change type? should it all be genIn?
-  val stage_outputs = Wire(Vec(log2Up(config.p)+1, Vec(config.p, genIn)))
-  stage_outputs(0) := io.data_in
+  val stage_outputs = List.fill(log2Up(config.p)+1)(List.fill(config.p)(Wire(genIn)))
+  io.data_in.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
 
   // indices to the twiddle Vec input
-  var indices = Array(Array(0,1),Array(0,2))
+  var indices = List(List(0,1),List(0,2))
   for (i <- 0 until log2Up(config.p)-2) {
     indices = indices.map(x => x.map(y => y+1))
     val indices_max = indices.foldLeft(0)((b,a) => max(b,a.foldLeft(0)((d,c) => max(c,d))))

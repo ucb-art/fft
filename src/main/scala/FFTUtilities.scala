@@ -45,13 +45,11 @@ case class FFTConfig(n: Int = 8, // n-point FFT
   // if more than one pipeline register per stage is requested, registers are doubled up
 
   // biplex
-  if (p < n) { // no biplexes if p = n
-    val b_num = (log2Up(bp)+1).toDouble
-    val b_den = pipelineDepth%log2Up(bp)+1
-    val b_stages_to_pipeline = (0 until biplex_pipe%log2Up(bp)).map(x => if (b_num/b_den*(x+1) < b_num/2 && b_num/b_den*(x+1)-0.5 == floor(b_num/b_den*(x+1))) floor(b_num/b_den*(x+1)).toInt else round(b_num/b_den*(x+1)).toInt)
-    val b_pipelines_per_stage = floor(biplex_pipe/log2Up(bp)).toInt
-    val b_pipe_amts = (0 until log2Up(bp)).map(x => b_pipelines_per_stage + {if (b_stages_to_pipeline contains (x+1)) 1 else 0})
-  }
+  val b_num = (log2Up(bp)+1).toDouble
+  val b_den = pipelineDepth%log2Up(bp)+1
+  val b_stages_to_pipeline = (0 until biplex_pipe%log2Up(bp)).map(x => if (b_num/b_den*(x+1) < b_num/2 && b_num/b_den*(x+1)-0.5 == floor(b_num/b_den*(x+1))) floor(b_num/b_den*(x+1)).toInt else round(b_num/b_den*(x+1)).toInt)
+  val b_pipelines_per_stage = floor(biplex_pipe/log2Up(bp)).toInt
+  val b_pipe_amts = (0 until log2Up(bp)).map(x => b_pipelines_per_stage + {if (b_stages_to_pipeline contains (x+1)) 1 else 0})
 
   // direct
   val d_num = (log2Up(p)+1).toDouble
@@ -72,6 +70,18 @@ object Butterfly {
   }
 }
 
+// simple barrel shifter, probably doesn't produce efficient hardware though
+object BarrelShifter {
+  def apply[T<:Data](in: Vec[T], shift: UInt): Vec[T] = 
+  {
+    Vec((0 until in.size).map(i => {
+      val idx = UInt(width=log2Up(in.size))
+      idx := shift + UInt(i)
+      in(idx)
+    }))
+  }
+}
+
 // shift register implemented as an SRAM memory with internal counter
 object ShiftRegisterMem {
 
@@ -86,7 +96,9 @@ object ShiftRegisterMem {
     if (n%2 == 1 && use_sp_mem && !use_two_srams) {
       println("Warning: Creating a ShiftRegisterMem with an odd shift amount will use two SRAMs instead of one.")
     }
-    if (use_sp_mem) {
+    if (n == 0) {
+      in
+    } else if (use_sp_mem) {
       val out = in.cloneType
       if (use_two_srams || n%2 == 1) {
         val sram0 = SeqMem(n, in.cloneType)
@@ -142,8 +154,7 @@ object ShiftRegisterMem {
         }
         out
       }
-    }
-    else {
+    } else {
       val sram = SeqMem(n, in.cloneType)
       val index_counter = Counter(en, n)._1
       when (en) {

@@ -81,8 +81,8 @@ class FFTSpec extends FlatSpec with Matchers {
   behavior of "DirectFFT"
   it should "Fourier transform the input, fast" in {
     def getReal(): DspReal = new DspReal
-    //chisel3.iotesters.Driver(() => new DirectFFTTestbench(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 32, p = 32))) {
-    chisel3.iotesters.Driver(() => new DirectFFTTestbench(genIn = DspComplex(FixedPoint(width=16, binaryPoint=8), FixedPoint(width=16, binaryPoint=8)), config = new FFTConfig(n = 32, p = 32))) {
+    chisel3.iotesters.Driver(() => new DirectFFTTestbench(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 32, p = 32))) {
+    //chisel3.iotesters.Driver(() => new DirectFFTTestbench(genIn = DspComplex(FixedPoint(width=16, binaryPoint=8), FixedPoint(width=16, binaryPoint=8)), config = new FFTConfig(n = 32, p = 32))) {
       c => new DirectFFTTester(c)
     } should be (true)
   }
