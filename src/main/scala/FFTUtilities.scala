@@ -58,6 +58,8 @@ case class FFTConfig(n: Int = 8, // n-point FFT
   val d_pipelines_per_stage = floor(direct_pipe/log2Up(p)).toInt
   val d_pipe_amts = (0 until log2Up(p)).map(x => d_pipelines_per_stage + {if (d_stages_to_pipeline contains (x+1)) 1 else 0})
   val d_pipe_delays = d_pipe_amts.scanLeft(0)((a,b) => a+b).dropRight(1).+:(-1)
+
+  val twiddle = (0 until n/4).map(x => Array(cos(2*Pi/n*x),-sin(2*Pi/n*x)))
 }
 
 // single radix-2 butterfly
