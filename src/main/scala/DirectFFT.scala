@@ -8,18 +8,17 @@ import chisel3.util._
 import chisel3._
 import dsptools.numbers.{DspComplex, Real}
 import dsptools.numbers.implicits._
+import dsptools.junctions._
+import dsptools.counters._
 import scala.math._
 import FFTFunctions._
 
 // fast fourier transform io
 class DirectFFTIO[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None,
-  val config: FFTConfig) extends Bundle {
+  val config: FFTConfig = FFTConfig()) extends Bundle {
 
-  val data_in = Input(Vec(config.p, genIn))
-  val sync_in = Input(UInt(log2Up(config.bp)))
-
-  val data_out = Output(Vec(config.p, genOut.getOrElse(genIn)))
-  val sync_out = Output(UInt(log2Up(config.bp)))
+  val in = Input(ValidWithSync(Vec(config.p, genIn)))
+  val out = Output(ValidWithSync(Vec(config.p, genOut.getOrElse(genIn))))
 }
 
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
@@ -29,6 +28,8 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   val config: FFTConfig = FFTConfig()) extends Module {
 
   val io = IO(new DirectFFTIO(genIn, genOut, config))
+
+  val sync = CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
 
   // indicies to the twiddle factors
   var indices = Array.fill(log2Up(config.n))(0)
@@ -54,7 +55,7 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   val twiddle_rom = Vec(config.twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))
   val indices_rom = Vec(indices.map(x => UInt(x)))
   // TODO: make this not a multiply
-  val start = io.sync_in*UInt(config.p-1)
+  val start = sync*UInt(config.p-1)
   // special case when n = 4, because the pattern breaks down
   // TODO: switch this to multiplyByJ
   if (config.n == 4) {
@@ -66,12 +67,13 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   }
 
   // sync
-  io.sync_out := ShiftRegister(io.sync_in, config.direct_pipe)
+  io.out.sync := ShiftRegister(io.in.sync, config.direct_pipe)
+  io.out.valid := ShiftRegister(io.in.valid, config.direct_pipe)
 
   // p-point decimation-in-time direct form FFT with inputs in normal order (outputs bit reversed)
   // TODO: change type? should it all be genIn?
   val stage_outputs = List.fill(log2Up(config.p)+1)(List.fill(config.p)(Wire(genIn)))
-  io.data_in.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
+  io.in.bits.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
 
   // indices to the twiddle Vec input
   var vindices = List(List(0,1),List(0,2))
@@ -91,12 +93,12 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
 
       // hook it up
       List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(stage_outputs(i)(start), stage_outputs(i)(start+skip)), twiddle(vindices(j)(i)))).foreach { x =>
-        x._1 := ShiftRegister(x._2, config.d_pipe_amts(i))
+        x._1 := ShiftRegister(x._2, config.d_pipe_amts(i), io.in.valid)
       }
 
     }
   }
 
   // wire up top-level outputs
-  io.data_out := stage_outputs(log2Up(config.p))
+  io.out.bits := stage_outputs(log2Up(config.p))
 }
