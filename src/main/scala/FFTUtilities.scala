@@ -6,7 +6,17 @@ import dsptools.numbers.{DspComplex, Real}
 import dsptools.numbers.implicits._
 import scala.math._
 
-object FFTFunctions {
+case class FFTConfig(n: Int = 8, // n-point FFT
+                     p: Int = 8, // parallelism, or number of parallel inputs
+                     pipelineDepth: Int = 0,
+                     real: Boolean = false // real inputs?
+                    ) {
+  assert(n >= 4, "For an n-point FFT, n must be 4 or more")
+  assert(p >= 2, "Must have at least 2 parallel inputs")
+  assert(isPow2(n), "For an n-point FFT, n must be a power of 2")
+  assert(pipelineDepth >= 0, "Cannot have negative pipelining, you silly goose.")
+  assert(p <= n, "An n-point FFT cannot have more than n inputs (p must be less than or equal to n)")
+  assert(isPow2(p), "FFT parallelism must be a power of 2")
 
   // bit reverse a value
   def bit_reverse(in: Int, width: Int): Int = {
@@ -21,45 +31,40 @@ object FFTFunctions {
     out
   }
 
-}
-
-case class FFTConfig(n: Int = 8, // n-point FFT
-                     p: Int = 8, // parallelism, or number of parallel inputs
-                     pipelineDepth: Int = 0,
-                     real: Boolean = false // real inputs?
-                    ) {
-  assert(n >= 4, "For an n-point FFT, n must be 4 or more")
-  assert(isPow2(n), "For an n-point FFT, n must be a power of 2")
-  assert(pipelineDepth >= 0, "Cannot have negative pipelining, you silly goose.")
-  assert(p <= n, "An n-point FFT cannot have more than n inputs (p must be less than or equal to n)")
-  assert(isPow2(p), "FFT parallelism must be a power of 2")
-
   // bp stands for biplex points, so the biplex FFT is a bp-point FFT
   val bp = n/p
 
-  val biplex_pipe = floor(log2Up(bp).toDouble/log2Up(n)*pipelineDepth).toInt
-  val direct_pipe = pipelineDepth-biplex_pipe
+  // pipelining
+  val num = (log2Up(n)+1).toDouble
+  val ratio = num/(pipelineDepth%log2Up(n)+1)
+  val stages_to_pipeline = (0 until pipelineDepth%log2Up(n)).map(x => if (ratio*(x+1) < num/2 && ratio*(x+1)-0.5 == floor(ratio*(x+1))) floor(ratio*(x+1)).toInt else round(ratio*(x+1)).toInt)
+  val pipe = (0 until log2Up(n)).map(x => floor(pipelineDepth/log2Up(n)).toInt + {if (stages_to_pipeline contains (x+1)) 1 else 0})
+  val direct_pipe = pipe.drop(log2Up(bp)).foldLeft(0)(_+_)
+  val biplex_pipe = pipe.dropRight(log2Up(p)).foldLeft(0)(_+_)
 
-  // calculate where to place pipeline registers
-  // synthesis retiming will take care of the rest 
-  // if more than one pipeline register per stage is requested, registers are doubled up
-
-  // biplex
-  val b_num = (log2Up(bp)+1).toDouble
-  val b_den = pipelineDepth%log2Up(bp)+1
-  val b_stages_to_pipeline = (0 until biplex_pipe%log2Up(bp)).map(x => if (b_num/b_den*(x+1) < b_num/2 && b_num/b_den*(x+1)-0.5 == floor(b_num/b_den*(x+1))) floor(b_num/b_den*(x+1)).toInt else round(b_num/b_den*(x+1)).toInt)
-  val b_pipelines_per_stage = floor(biplex_pipe/log2Up(bp)).toInt
-  val b_pipe_amts = (0 until log2Up(bp)).map(x => b_pipelines_per_stage + {if (b_stages_to_pipeline contains (x+1)) 1 else 0})
-
-  // direct
-  val d_num = (log2Up(p)+1).toDouble
-  val d_den = pipelineDepth%log2Up(p)+1
-  val d_stages_to_pipeline = (0 until direct_pipe%log2Up(p)).map(x => if (d_num/d_den*(x+1) < d_num/2 && d_num/d_den*(x+1)-0.5 == floor(d_num/d_den*(x+1))) floor(d_num/d_den*(x+1)).toInt else round(d_num/d_den*(x+1)).toInt)
-  val d_pipelines_per_stage = floor(direct_pipe/log2Up(p)).toInt
-  val d_pipe_amts = (0 until log2Up(p)).map(x => d_pipelines_per_stage + {if (d_stages_to_pipeline contains (x+1)) 1 else 0})
-  val d_pipe_delays = d_pipe_amts.scanLeft(0)((a,b) => a+b).dropRight(1).+:(-1)
-
+  // twiddling
   val twiddle = (0 until n/4).map(x => Array(cos(2*Pi/n*x),-sin(2*Pi/n*x)))
+
+  // indicies to the twiddle factors
+  var indices = Array.fill(log2Up(n))(0)
+  var prev = Array.fill(log2Up(n))(0)
+  for (i <- 1 until n/2) {
+    val next = (0 until log2Up(n)).map(x => floor(i/pow(2,x)).toInt).reverse
+    prev.zip(next).foreach{case(p,n) => {if (n != p) indices = indices :+ n}}
+    prev = next.toArray
+  }
+  indices = indices.map(x => bit_reverse(x, log2Up(n)-1))
+
+  // take subsets of indices for split FFTs
+  var q = n
+  var temp = Array(indices)
+  var bindices = Array[Int]()
+  while (q > p) {
+    temp.foreach{x => bindices = bindices ++ x.take(1)}
+    temp = temp.map(x => x.drop(1).splitAt((x.size-1)/2)).flatMap(x => Array(x._1, x._2))
+    q = q/2
+  }
+  val dindices = temp.flatten
 }
 
 // single radix-2 butterfly
@@ -77,7 +82,7 @@ object BarrelShifter {
   def apply[T<:Data](in: Vec[T], shift: UInt): Vec[T] = 
   {
     Vec((0 until in.size).map(i => {
-      val idx = UInt(width=log2Up(in.size))
+      val idx = Wire(UInt(width=log2Up(in.size)))
       idx := shift + UInt(i)
       in(idx)
     }))
