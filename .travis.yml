@@ -7,3 +7,4 @@ sudo: false
 script:
   - cd dsp-framework; ./update.bash; cd ..
   - sbt test
+
