@@ -55,7 +55,7 @@ case class FFTConfig(n: Int = 8, // n-point FFT
   }
   indices = indices.map(x => bit_reverse(x, log2Up(n)-1))
 
-  // take subsets of indices for split FFTs
+  // take subsets of indices for split FFTs, then bit reverse to permute as needed
   var q = n
   var temp = Array(indices)
   var bindices = Array[Int]()
@@ -64,7 +64,7 @@ case class FFTConfig(n: Int = 8, // n-point FFT
     temp = temp.map(x => x.drop(1).splitAt((x.size-1)/2)).flatMap(x => Array(x._1, x._2))
     q = q/2
   }
-  val dindices = temp.flatten
+  val dindices = (0 until temp.size).map(x => temp(bit_reverse(x, log2Up(bp)))).flatten
 }
 
 // single radix-2 butterfly

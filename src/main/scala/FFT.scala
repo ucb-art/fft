@@ -31,14 +31,14 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   // synchronize
   val sync = CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
   io.out.sync := ShiftRegister(io.in.sync, config.direct_pipe)
-  io.out.valid := ShiftRegister(io.in.valid, config.direct_pipe)
+  io.out.valid := io.in.valid
 
-  // wire up twiddles
-  val twiddle = Vec.fill(config.p-1)(Wire(genTwiddle.getOrElse(genIn)))
+  // wire up twiddles)
   val twiddle_rom = Vec(config.twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))
   val indices_rom = Vec(config.dindices.map(x => UInt(x)))
   // TODO: make this not a multiply
   val start = sync*UInt(config.p-1)
+  val twiddle = Vec.fill(config.p-1)(Wire(genTwiddle.getOrElse(genIn)))
   // special case when n = 4, because the pattern breaks down
   if (config.n == 4) {
     twiddle := (0 until config.p-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(0)), twiddle_rom(0)))
@@ -64,7 +64,7 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   for (i <- 0 until log2Up(config.p)) {
     for (j <- 0 until config.p/2) {
 
-      val skip = pow(2,log2Up(config.p/2)-i).toInt
+      val skip = pow(2,log2Up(config.n/2)-(i+log2Ceil(config.bp))).toInt
       val start = ((j % skip) + floor(j/skip) * skip*2).toInt
 
       // hook it up
@@ -79,50 +79,81 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   io.out.bits := stage_outputs(log2Up(config.p))
 }
 
-//// fast fourier transform - cooley-tukey algorithm, decimation-in-time
-//// biplex pipelined version
-//// note, this is always a bp-point FFT
-//class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
-//  val config: FFTConfig = FFTConfig()) extends Module {
-//
-//  val io = IO(new FFTIO(genIn, genOut, config))
-//
-//  // synchronize
-//  val sync = List.fill(log2Up(config.bp)+1)(Wire(UInt()))
-//  sync(0) := CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
-//  io.out.sync := sync(log2Up(config.bp)) === UInt(config.bp-1)
-//  io.out.valid := ShiftRegister(io.in.valid, config.bp+config.biplex_pipe-1)
-//
-//  // wire up twiddles
-//  val twiddle_rom = Vec(config.twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))
-//  val indices_rom = Vec(config.bindices.map(x => UInt(x)))
-//
-//  // bp-point decimation-in-time biplex pipelined FFT with outputs in bit-reversed order
-//  // TODO: change type? should it all be genIn?
-//  val stage_outputs = List.fill(log2Up(config.bp)+1)(List.fill(config.p)(Wire(genIn)))
-//  io.in.bits.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
-//
-//  // create the FFT hardware
-//  for (i <- 0 until log2Up(config.bp)) {
-//    for (j <- 0 until config.p/2) {
-//
-//      val skip = 1
-//      val start = j*2
-//
-//      // hook it up
-//      val stage_delay = (config.bp/pow(2,i+2)).toInt
-//      println(f"stage delay = $stage_delay")
-//      sync(i+1) := ShiftRegister(sync(i), stage_delay, io.in.valid)
-//      val twiddle = DspComplex.wire(implicitly[Real[T]].fromDouble(1.0), implicitly[Real[T]].fromDouble(0.0))//indices_rom(sync(i+1)*UInt(config.bp-1)
-//      val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegister(stage_outputs(i)(start+skip), stage_delay, io.in.valid)), sync(i+1)(log2Up(config.bp)-i-1))
-//      List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(ShiftRegister(mux_out(0), stage_delay, io.in.valid), mux_out(1)), twiddle)).foreach { x =>
-//        x._1 := ShiftRegister(x._2, config.pipe(i), io.in.valid)
-//      }
-//
-//    }
-//  }
-//
-//  // wire up top-level outputs
-//  io.out.bits := stage_outputs(log2Up(config.p))
-//
-//}
+// fast fourier transform - cooley-tukey algorithm, decimation-in-time
+// biplex pipelined version
+// note, this is always a bp-point FFT
+class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
+  val config: FFTConfig = FFTConfig()) extends Module {
+
+  val io = IO(new FFTIO(genIn, genOut, config))
+
+  // synchronize
+  val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
+  val sync = List.fill(log2Up(config.bp)+1)(Wire(UInt(width=log2Up(config.bp))))
+  sync(0) := CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
+  sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegister(prev, delay, io.in.valid) }
+  io.out.sync := sync(log2Up(config.bp)) === UInt(config.bp/2-1)
+  io.out.valid := io.in.valid
+
+  // wire up twiddles
+  val twiddle_rom = Vec(config.twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))
+  val indices_rom = Vec(config.bindices.map(x => UInt(x)))
+  val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else Reverse(sync(x+1))(x,1) }))
+  val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genIn)))
+  // special cases
+  if (config.n == 4) {
+    twiddle := Vec((0 until log2Up(config.bp)).map(x => Mux(indices(x)(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(0)), twiddle_rom(0))))
+  } else if (config.bp == 2) {
+    twiddle := Vec((0 until log2Up(config.bp)).map(x => twiddle_rom(indices(x))))
+  } else {
+    twiddle := Vec((0 until log2Up(config.bp)).map(x => Mux(indices(x)(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(indices(x)(log2Ceil(config.n/4)-1, 0))), twiddle_rom(indices(x)))))
+  }
+
+  // bp-point decimation-in-time biplex pipelined FFT with outputs in bit-reversed order
+  // TODO: change type? should it all be genIn?
+  val stage_outputs = List.fill(log2Up(config.bp)+2)(List.fill(config.p)(Wire(genIn)))
+  io.in.bits.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
+
+  // create the FFT hardware
+  for (i <- 0 until log2Up(config.bp)+1) {
+    for (j <- 0 until config.p/2) {
+
+      val skip = 1
+      val start = j*2
+
+      // hook it up
+      // last stage just has one extra permutation, no butterfly
+      val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegister(stage_outputs(i)(start+skip), stage_delays(i), io.in.valid)), sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }))
+      if (i == log2Up(config.bp)) {
+        List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(List(ShiftRegister(mux_out(0), stage_delays(i), io.in.valid), mux_out(1))).foreach { x => x._1 := x._2 }
+      } else {
+        List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(ShiftRegister(mux_out(0), stage_delays(i), io.in.valid), mux_out(1)), twiddle(i))).foreach { x => x._1 := ShiftRegister(x._2, config.pipe(i), io.in.valid) }
+      }
+
+    }
+  }
+
+  // wire up top-level outputs
+  io.out.bits := stage_outputs(log2Up(config.bp)+1)
+
+}
+
+// fast fourier transform - cooley-tukey algorithm, decimation-in-time
+// mixed version
+// note, this is always an n-point FFT
+class FFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
+  val config: FFTConfig = FFTConfig()) extends Module {
+
+  val io = IO(new FFTIO(genIn, genOut, config))
+  
+  val direct = Module(new DirectFFT(genIn, genOut, genTwiddle, config))
+  io.out <> direct.io.out
+
+  if (config.n != config.p) {
+    val biplex = Module(new BiplexFFT(genIn, genOut, genTwiddle, config))
+    direct.io.in := biplex.io.out
+    biplex.io.in <> io.in
+  } else {
+    direct.io.in <> io.in
+  }
+}
