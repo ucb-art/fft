@@ -1,0 +1,10 @@
+git:
+  submodules: true
+language: scala
+# run on new infrastructure
+sudo: false
+
+script:
+  - cd dsp-framework; ./update.bash; cd ..
+  - sbt travis:test
+

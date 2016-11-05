@@ -15,6 +15,9 @@ import dsptools.numbers.implicits._
 import dsptools.numbers.{DspComplex, Real}
 import scala.util.Random
 import scala.math._
+import org.scalatest.Tag
+
+object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
 class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
 
@@ -81,7 +84,7 @@ class FFTSpec extends FlatSpec with Matchers {
 
   // FFT
   behavior of "FFT"
-  it should "Fourier transform the input, fastly" in {
+  it should "Fourier transform the input, fastly" taggedAs(LocalTest) in {
     def getReal(): DspReal = new DspReal
     for (i <- 2 until 5) {
       for (j <- 1 until i) {
