@@ -41,6 +41,9 @@ case class FFTConfig(n: Int = 8, // n-point FFT
   val pipe = (0 until log2Up(n)).map(x => floor(pipelineDepth/log2Up(n)).toInt + {if (stages_to_pipeline contains (x+1)) 1 else 0})
   val direct_pipe = pipe.drop(log2Up(bp)).foldLeft(0)(_+_)
   val biplex_pipe = pipe.dropRight(log2Up(p)).foldLeft(0)(_+_)
+  println("Pipeline registers inserted on stages: " + pipe.toArray.deep.mkString(","))
+  println(s"Total biplex pipeline depth: $biplex_pipe")
+  println(s"Total direct pipeline depth: $direct_pipe")
 
   // twiddling
   val twiddle = (0 until n/4).map(x => Array(cos(2*Pi/n*x),-sin(2*Pi/n*x)))

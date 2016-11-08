@@ -38,11 +38,14 @@ class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends 
   val parallelism = c.config.p
   val fft_size = c.config.n
   val bp = c.config.bp
-  val freq = 4
-  val input = (0 until fft_size).map(x => Complex(scala.math.sin(2*math.Pi * freq * x.toDouble / fft_size), 0)).toArray
+  val pipe = c.config.pipelineDepth
+  val freq = 7
+  val real_freq = fft_size-freq
+  val input = (0 until fft_size).map(x => Complex(scala.math.sin(2*math.Pi * real_freq * x.toDouble / fft_size), scala.math.cos(2*math.Pi * real_freq * x.toDouble / fft_size))).toArray
   val output = Array.fill(fft_size)(Complex(0,0))
   var input_counter = 0
   var output_counter = -1
+  var step_counter = 0
   var break = 0 
   reset(12)
   while (break == 0) {
@@ -51,6 +54,7 @@ class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends 
     poke(c.io.in.valid, 1)
     input_counter = input_counter + 1
     step(1)
+    step_counter = step_counter+1
     val valid = peek(c.io.out.valid).toInt
     val sync = peek(c.io.out.sync).toInt
     if (valid == 1 && output_counter >= 0) { 
@@ -60,13 +64,13 @@ class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends 
       }}
       output_counter = output_counter + 1 
     }
-    if (valid == 1 && sync == 1 && output_counter == -1) { output_counter = 0 } 
-    else if (valid == 1 && sync == 1) { break = 1 }
+    if (valid == 1 && sync == 1 && output_counter == -1 && step_counter > pipe) { output_counter = 0 } 
+    else if (valid == 1 && sync == 1 && step_counter > pipe) { break = 1 }
   }
 
   output.zip(fourierTr(DenseVector(input)).toArray).zipWithIndex.foreach { case ((chisel, ref), index) =>
     if (chisel != ref) {
-      val epsilon = 1e-13
+      val epsilon = 1e-12
       val err = (chisel-ref).abs/(ref.abs+epsilon)
       assert(err < epsilon || ref.abs < epsilon, s"Error: mismatch on bin $index of $err\n\tReference: $ref\n\tChisel:    $chisel")
     }
@@ -86,13 +90,18 @@ class FFTSpec extends FlatSpec with Matchers {
   behavior of "FFT"
   it should "Fourier transform the input, fastly" taggedAs(LocalTest) in {
     def getReal(): DspReal = new DspReal
-    for (i <- 2 until 5) {
-      for (j <- 1 until i) {
-        chisel3.iotesters.Driver(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt))) {
-          c => new FFTTester(c)
-        } should be (true)
-      }
-    }
+    //for (i <- 2 until 5) {
+    //  for (j <- 1 until i) {
+    //    for (k <- 0 until 4) {
+          val i = 4
+          val j = 2
+          val k = 7
+          chisel3.iotesters.Driver(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
+            c => new FFTTester(c)
+          } should be (true)
+    //    }
+    //  }
+    //}
   }
 
 }
