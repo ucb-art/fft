@@ -34,7 +34,6 @@ class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends 
     out
   }
 
-  import co.theasi.plotly._
   val parallelism = c.config.p
   val fft_size = c.config.n
   val bp = c.config.bp
@@ -76,6 +75,7 @@ class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends 
     }
   }
 
+  //import co.theasi.plotly._
   //val x = (0 until output.size)
   //val y = fourierTr(DenseVector(input)).toArray
   //val p = Plot()
@@ -90,18 +90,30 @@ class FFTSpec extends FlatSpec with Matchers {
   behavior of "FFT"
   it should "Fourier transform the input, fastly" taggedAs(LocalTest) in {
     def getReal(): DspReal = new DspReal
-    //for (i <- 2 until 5) {
-    //  for (j <- 1 until i) {
-    //    for (k <- 0 until 4) {
-          val i = 4
-          val j = 2
-          val k = 7
+    for (i <- 2 until 5) {
+      for (j <- 1 until i) {
+        for (k <- 0 until 4) {
           chisel3.iotesters.Driver(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
             c => new FFTTester(c)
           } should be (true)
-    //    }
-    //  }
-    //}
+        }
+      }
+    }
+  }
+
+  // Travis FFT
+  behavior of "FFT Travis"
+  it should "Fourier transform the input, fastly" in {
+    def getReal(): DspReal = new DspReal
+    for (i <- 2 until 5) {
+      for (j <- 1 until i) {
+        for (k <- 0 until 4) {
+          chisel3.iotesters.Driver(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
+            c => new FFTTester(c)
+          } should be (true)
+        }
+      }
+    }
   }
 
 }
