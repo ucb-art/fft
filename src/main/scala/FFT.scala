@@ -95,7 +95,6 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   val sync = List.fill(log2Up(config.bp)+1)(Wire(UInt(width=log2Up(config.bp))))
   sync(0) := CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
   sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegister(prev, delay, io.in.valid) }
-  //sync.drop(1).zip(sync).zip(stage_delays).zip(config.pipe).foreach { case (((next, prev), delay), pipe) => next := ShiftRegister(prev, delay+pipe, io.in.valid) }
   io.out.sync := sync(log2Up(config.bp)) === UInt((config.bp/2-1+config.biplex_pipe)%config.bp)
   io.out.valid := io.in.valid
 
@@ -105,7 +104,6 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genIn)))
   twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(implicitly[Real[T]].fromDouble(value(0)), implicitly[Real[T]].fromDouble(value(1))) }
   val indices_rom = Vec(config.bindices.map(x => UInt(x)))
-  //val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else Reverse(sync(x+1))(x,1) }))
   val pipes = (0 until log2Up(config.bp)).map(x => config.pipe.dropRight(log2Up(config.n)-x).foldRight(0)(_+_))
   println("pipes array = " + pipes.toArray.deep.mkString(","))
   val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else Reverse(ShiftRegister(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).foldRight(0)(_+_), io.in.valid))(x,1) }))
@@ -134,7 +132,6 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
       // hook it up
       // last stage just has one extra permutation, no butterfly
       val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegister(stage_outputs(i)(start+skip), stage_delays(i), io.in.valid)), ShiftRegister(sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).foldRight(0)(_+_)}, io.in.valid))
-      //val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegister(stage_outputs(i)(start+skip), stage_delays(i), io.in.valid)), sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }))
       if (i == log2Up(config.bp)) {
         List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(List(ShiftRegister(mux_out(0), stage_delays(i), io.in.valid), mux_out(1))).foreach { x => x._1 := x._2 }
       } else {
