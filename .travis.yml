@@ -3,9 +3,6 @@ git:
 language: scala
 # run on new infrastructure
 sudo: false
-cache:
-  directories:
-    $HOME/.ivy2
 
 script:
   - cd dsp-framework; ./update.bash; cd ..
