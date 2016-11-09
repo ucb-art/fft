@@ -341,3 +341,6 @@ test_run_dir/
 
 # rocket-chip
 lib
+
+# custom
+/generated-src

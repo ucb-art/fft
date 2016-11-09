@@ -88,34 +88,36 @@ class FFTSpec extends FlatSpec with Matchers {
 
   // FFT
   behavior of "FFT"
-  it should "Fourier transform the input, fastly" taggedAs(LocalTest) in {
-    def getReal(): DspReal = DspReal(0.0)
-    for (i <- 2 until 5) {
-      for (j <- 1 until i) {
-        for (k <- 0 until 4) {
-          chisel3.iotesters.Driver(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
-            c => new FFTTester(c)
-          } should be (true)
-        }
-      }
-    }
-  }
-
-  // Travis FFT
-  behavior of "FFT Travis"
   it should "Fourier transform the input, fastly" in {
-    def getReal(): DspReal = DspReal(0.0)
-    for (i <- 2 until 5) {
-      for (j <- 1 until i) {
-        for (k <- 0 until 4) {
+    def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
+    //def getReal(): DspReal = DspReal(0.0)
+    //for (i <- 2 until 5) {
+    //  for (j <- 1 until i) {
+    //    for (k <- 0 until 4) {
+          val i = 4
+          val j = 2
+          val k = 0
           chisel3.iotesters.Driver(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
             c => new FFTTester(c)
           } should be (true)
-        }
-      }
-    }
+    //    }
+    //  }
+    //}
   }
+}
 
+object FFTVerilog extends App {
+  override def main(args: Array[String]): Unit = {
+    import firrtl._
+    //def getReal(): DspReal = DspReal(0.0)
+    def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
+    val input = chisel3.Driver.emit(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 8, p = 2)))
+    val om = new ExecutionOptionsManager("FFT") with HasFirrtlOptions
+    om.setTargetDirName("generated-src")
+    om.setTopName("FFT")
+    om.firrtlOptions = om.firrtlOptions.copy(firrtlSource = Some(input))
+    println(firrtl.Driver.execute(om))
+  }
 }
 
 object FFTSpec {

@@ -33,8 +33,11 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   io.out.sync := ShiftRegister(io.in.sync, config.direct_pipe)
   io.out.valid := io.in.valid
 
-  // wire up twiddles)
-  val twiddle_rom = Vec(config.twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))
+  // wire up twiddles
+  //val twiddle_rom = Vec(config.twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))
+  // hack:
+  val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genIn)))
+  twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(implicitly[Real[T]].fromDouble(value(0)), implicitly[Real[T]].fromDouble(value(1))) }
   val indices_rom = Vec(config.dindices.map(x => UInt(x)))
   // TODO: make this not a multiply
   val start = sync*UInt(config.p-1)
@@ -97,7 +100,10 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   io.out.valid := io.in.valid
 
   // wire up twiddles
-  val twiddle_rom = Vec(config.twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))
+  //val twiddle_rom = Vec(config.twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))
+  // hack:
+  val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genIn)))
+  twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(implicitly[Real[T]].fromDouble(value(0)), implicitly[Real[T]].fromDouble(value(1))) }
   val indices_rom = Vec(config.bindices.map(x => UInt(x)))
   //val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else Reverse(sync(x+1))(x,1) }))
   val pipes = (0 until log2Up(config.bp)).map(x => config.pipe.dropRight(log2Up(config.n)-x).foldRight(0)(_+_))
