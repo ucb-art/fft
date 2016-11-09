@@ -38,6 +38,7 @@ class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends 
   val fft_size = c.config.n
   val bp = c.config.bp
   val pipe = c.config.pipelineDepth
+  val latency = pipe + bp/2 + (0 until log2Up(bp)).map(x => (bp/pow(2,x+1)).toInt).foldRight(0)(_+_)
   val freq = 7
   val real_freq = fft_size-freq
   val input = (0 until fft_size).map(x => Complex(scala.math.sin(2*math.Pi * real_freq * x.toDouble / fft_size), scala.math.cos(2*math.Pi * real_freq * x.toDouble / fft_size))).toArray
@@ -63,10 +64,11 @@ class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends 
       }}
       output_counter = output_counter + 1 
     }
-    if (valid == 1 && sync == 1 && output_counter == -1 && step_counter > pipe) { output_counter = 0 } 
-    else if (valid == 1 && sync == 1 && step_counter > pipe) { break = 1 }
+    if (valid == 1 && sync == 1 && output_counter == -1 && step_counter >= latency) { output_counter = 0 } 
+    else if (valid == 1 && sync == 1 && step_counter >= latency) { break = 1 }
   }
 
+  println(s"Run took $step_counter cycles")
   output.zip(fourierTr(DenseVector(input)).toArray).zipWithIndex.foreach { case ((chisel, ref), index) =>
     if (chisel != ref) {
       val epsilon = 1e-12
@@ -94,6 +96,7 @@ class FFTSpec extends FlatSpec with Matchers {
     for (i <- 2 until 5) {
       for (j <- 1 until i) {
         for (k <- 0 until 4) {
+          println(s"Running FFT test with ${pow(2,i).toInt} channels, ${pow(2,j).toInt} parallel lanes, and a pipeline depth of $k")
           chisel3.iotesters.Driver(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
             c => new FFTTester(c)
           } should be (true)
