@@ -89,7 +89,7 @@ class FFTSpec extends FlatSpec with Matchers {
   // FFT
   behavior of "FFT"
   it should "Fourier transform the input, fastly" taggedAs(LocalTest) in {
-    def getReal(): DspReal = new DspReal
+    def getReal(): DspReal = DspReal(0.0)
     for (i <- 2 until 5) {
       for (j <- 1 until i) {
         for (k <- 0 until 4) {
@@ -104,7 +104,7 @@ class FFTSpec extends FlatSpec with Matchers {
   // Travis FFT
   behavior of "FFT Travis"
   it should "Fourier transform the input, fastly" in {
-    def getReal(): DspReal = new DspReal
+    def getReal(): DspReal = DspReal(0.0)
     for (i <- 2 until 5) {
       for (j <- 1 until i) {
         for (k <- 0 until 4) {
