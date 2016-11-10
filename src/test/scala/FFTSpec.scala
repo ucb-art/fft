@@ -106,20 +106,6 @@ class FFTSpec extends FlatSpec with Matchers {
   }
 }
 
-object FFTVerilog extends App {
-  override def main(args: Array[String]): Unit = {
-    import firrtl._
-    //def getReal(): DspReal = DspReal(0.0)
-    def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
-    val input = chisel3.Driver.emit(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 8, p = 2)))
-    val om = new ExecutionOptionsManager("FFT") with HasFirrtlOptions
-    om.setTargetDirName("generated-src")
-    om.setTopName("FFT")
-    om.firrtlOptions = om.firrtlOptions.copy(firrtlSource = Some(input))
-    println(firrtl.Driver.execute(om))
-  }
-}
-
 object FFTSpec {
   def getReal(): DspReal = new DspReal
   def main(args: Array[String]): Unit = {
