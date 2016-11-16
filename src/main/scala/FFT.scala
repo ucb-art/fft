@@ -58,7 +58,7 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   var indices = List(List(0,1),List(0,2))
   for (i <- 0 until log2Up(config.p)-2) {
     indices = indices.map(x => x.map(y => y+1))
-    val indices_max = indices.foldLeft(0)((b,a) => max(b,a.foldLeft(0)((d,c) => max(c,d))))
+    val indices_max = indices.foldLeft(0)((b,a) => max(b,a.reduceLeft((d,c) => max(c,d))))
     indices = indices ++ indices.map(x => x.map(y => y+indices_max))
     indices = indices.map(x => 0 +: x)
   }
@@ -104,9 +104,7 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genIn)))
   twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(implicitly[Real[T]].fromDouble(value(0)), implicitly[Real[T]].fromDouble(value(1))) }
   val indices_rom = Vec(config.bindices.map(x => UInt(x)))
-  val pipes = (0 until log2Up(config.bp)).map(x => config.pipe.dropRight(log2Up(config.n)-x).foldRight(0)(_+_))
-  println("pipes array = " + pipes.toArray.deep.mkString(","))
-  val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else Reverse(ShiftRegister(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).foldRight(0)(_+_), io.in.valid))(x,1) }))
+  val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegister(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_), io.in.valid)(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
   val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genIn)))
   // special cases
   if (config.n == 4) {
@@ -131,11 +129,10 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
 
       // hook it up
       // last stage just has one extra permutation, no butterfly
-      val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegister(stage_outputs(i)(start+skip), stage_delays(i), io.in.valid)), ShiftRegister(sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).foldRight(0)(_+_)}, io.in.valid))
+      val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegister(stage_outputs(i)(start+skip), stage_delays(i), io.in.valid)), ShiftRegister(sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).reduceRight(_+_)}, io.in.valid))
       if (i == log2Up(config.bp)) {
         List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(List(ShiftRegister(mux_out(0), stage_delays(i), io.in.valid), mux_out(1))).foreach { x => x._1 := x._2 }
       } else {
-        //List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(ShiftRegister(mux_out(0), stage_delays(i), io.in.valid), mux_out(1)), ShiftRegister(twiddle(i), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).foldRight(0)(_+_)}, io.in.valid))).foreach { x => x._1 := ShiftRegister(x._2, config.pipe(i), io.in.valid) }
         List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(ShiftRegister(mux_out(0), stage_delays(i), io.in.valid), mux_out(1)), twiddle(i))).foreach { x => x._1 := ShiftRegister(x._2, config.pipe(i), io.in.valid) }
       }
 

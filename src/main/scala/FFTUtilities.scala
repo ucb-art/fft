@@ -39,8 +39,8 @@ case class FFTConfig(n: Int = 8, // n-point FFT
   val ratio = num/(pipelineDepth%log2Up(n)+1)
   val stages_to_pipeline = (0 until pipelineDepth%log2Up(n)).map(x => if (ratio*(x+1) < num/2 && ratio*(x+1)-0.5 == floor(ratio*(x+1))) floor(ratio*(x+1)).toInt else round(ratio*(x+1)).toInt)
   val pipe = (0 until log2Up(n)).map(x => floor(pipelineDepth/log2Up(n)).toInt + {if (stages_to_pipeline contains (x+1)) 1 else 0})
-  val direct_pipe = pipe.drop(log2Up(bp)).foldLeft(0)(_+_)
-  val biplex_pipe = pipe.dropRight(log2Up(p)).foldLeft(0)(_+_)
+  val direct_pipe = pipe.drop(log2Up(bp)).reduceLeft(_+_)
+  val biplex_pipe = pipe.dropRight(log2Up(p)).reduceLeft(_+_)
   println("Pipeline registers inserted on stages: " + pipe.toArray.deep.mkString(","))
   println(s"Total biplex pipeline depth: $biplex_pipe")
   println(s"Total direct pipeline depth: $direct_pipe")
@@ -67,7 +67,7 @@ case class FFTConfig(n: Int = 8, // n-point FFT
     temp = temp.map(x => x.drop(1).splitAt((x.size-1)/2)).flatMap(x => Array(x._1, x._2))
     q = q/2
   }
-  val dindices = (0 until temp.size).map(x => temp(bit_reverse(x, log2Up(bp)))).flatten
+  val dindices = (0 until temp.size).map(x => temp((x*2)%temp.size+x*2/temp.size)).flatten
 }
 
 // single radix-2 butterfly
