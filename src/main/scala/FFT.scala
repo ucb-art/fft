@@ -30,7 +30,7 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
 
   // synchronize
   val sync = CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
-  io.out.sync := ShiftRegister(io.in.sync, config.direct_pipe)
+  io.out.sync := ShiftRegisterMem(io.in.sync, config.direct_pipe, io.in.valid)
   io.out.valid := io.in.valid
 
   // wire up twiddles
@@ -71,8 +71,8 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
       val start = ((j % skip) + floor(j/skip) * skip*2).toInt
 
       // hook it up
-      List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(stage_outputs(i)(start), stage_outputs(i)(start+skip)), ShiftRegister(twiddle(indices(j)(i)), config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(config.p)-i).foldLeft(0)(_+_), io.in.valid))).foreach { x =>
-        x._1 := ShiftRegister(x._2, config.pipe(i+log2Ceil(config.bp)), io.in.valid)
+      List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(stage_outputs(i)(start), stage_outputs(i)(start+skip)), ShiftRegisterMem(twiddle(indices(j)(i)), config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(config.p)-i).foldLeft(0)(_+_), io.in.valid))).foreach { x =>
+        x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), io.in.valid)
       }
 
     }
@@ -94,7 +94,7 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
   val sync = List.fill(log2Up(config.bp)+1)(Wire(UInt(width=log2Up(config.bp))))
   sync(0) := CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
-  sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegister(prev, delay, io.in.valid) }
+  sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegisterMem(prev, delay, io.in.valid) }
   io.out.sync := sync(log2Up(config.bp)) === UInt((config.bp/2-1+config.biplex_pipe)%config.bp)
   io.out.valid := io.in.valid
 
@@ -104,7 +104,7 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
   val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genIn)))
   twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(implicitly[Real[T]].fromDouble(value(0)), implicitly[Real[T]].fromDouble(value(1))) }
   val indices_rom = Vec(config.bindices.map(x => UInt(x)))
-  val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegister(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_), io.in.valid)(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
+  val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegisterMem(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_), io.in.valid)(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
   val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genIn)))
   // special cases
   if (config.n == 4) {
@@ -129,11 +129,11 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
 
       // hook it up
       // last stage just has one extra permutation, no butterfly
-      val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegister(stage_outputs(i)(start+skip), stage_delays(i), io.in.valid)), ShiftRegister(sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).reduceRight(_+_)}, io.in.valid))
+      val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegisterMem(stage_outputs(i)(start+skip), stage_delays(i), io.in.valid)), ShiftRegisterMem(sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).reduceRight(_+_)}, io.in.valid))
       if (i == log2Up(config.bp)) {
-        List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(List(ShiftRegister(mux_out(0), stage_delays(i), io.in.valid), mux_out(1))).foreach { x => x._1 := x._2 }
+        List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(List(ShiftRegisterMem(mux_out(0), stage_delays(i), io.in.valid), mux_out(1))).foreach { x => x._1 := x._2 }
       } else {
-        List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(ShiftRegister(mux_out(0), stage_delays(i), io.in.valid), mux_out(1)), twiddle(i))).foreach { x => x._1 := ShiftRegister(x._2, config.pipe(i), io.in.valid) }
+        List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(ShiftRegisterMem(mux_out(0), stage_delays(i), io.in.valid), mux_out(1)), twiddle(i))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i), io.in.valid) }
       }
 
     }

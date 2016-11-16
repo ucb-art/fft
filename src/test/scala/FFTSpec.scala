@@ -112,7 +112,7 @@ class FFTSpec extends FlatSpec with Matchers {
     //def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
     def getReal(): DspReal = DspReal(0.0)
     for (i <- 2 until 7) {
-      for (j <- 1 until i) {
+      for (j <- 1 until i+1) {
         for (k <- 0 until i+1) {
           chisel3.iotesters.Driver(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
             c => new FFTTester(c)

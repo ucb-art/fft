@@ -39,8 +39,8 @@ case class FFTConfig(n: Int = 8, // n-point FFT
   val ratio = num/(pipelineDepth%log2Up(n)+1)
   val stages_to_pipeline = (0 until pipelineDepth%log2Up(n)).map(x => if (ratio*(x+1) < num/2 && ratio*(x+1)-0.5 == floor(ratio*(x+1))) floor(ratio*(x+1)).toInt else round(ratio*(x+1)).toInt)
   val pipe = (0 until log2Up(n)).map(x => floor(pipelineDepth/log2Up(n)).toInt + {if (stages_to_pipeline contains (x+1)) 1 else 0})
-  val direct_pipe = pipe.drop(log2Up(bp)).reduceLeft(_+_)
-  val biplex_pipe = pipe.dropRight(log2Up(p)).reduceLeft(_+_)
+  val direct_pipe = pipe.drop(log2Up(bp)).foldLeft(0)(_+_)
+  val biplex_pipe = pipe.dropRight(log2Up(p)).foldLeft(0)(_+_)
   println("Pipeline registers inserted on stages: " + pipe.toArray.deep.mkString(","))
   println(s"Total biplex pipeline depth: $biplex_pipe")
   println(s"Total direct pipeline depth: $direct_pipe")
@@ -101,6 +101,7 @@ object ShiftRegisterMem {
   //   inputs twice the width of "in" and depth "n/2". I assume you
   //   want only 1 SRAM by default.
 
+  // TODO: can we use SeqMem instead of Mem?
   def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true), use_sp_mem: Boolean = false, use_two_srams: Boolean = false, name: String = null): T =
   {
     if (n%2 == 1 && use_sp_mem && !use_two_srams) {
@@ -111,8 +112,8 @@ object ShiftRegisterMem {
     } else if (use_sp_mem) {
       val out = in.cloneType
       if (use_two_srams || n%2 == 1) {
-        val sram0 = SeqMem(n, in.cloneType)
-        val sram1 = SeqMem(n, in.cloneType)
+        val sram0 = Mem(n, in.cloneType)
+        val sram1 = Mem(n, in.cloneType)
         if (name != null) {
           println(s"No name support yet")
           //sram0.setName(name + "_0")
@@ -137,7 +138,7 @@ object ShiftRegisterMem {
         out
       }
       else {
-        val sram = SeqMem(n/2, Vec(in, in))
+        val sram = Mem(n/2, Vec(in, in))
         if (name != null) {
           println(s"Name support not implemented")
           //sram.setName(name)
@@ -165,7 +166,7 @@ object ShiftRegisterMem {
         out
       }
     } else {
-      val sram = SeqMem(n, in.cloneType)
+      val sram = Mem(n, in.cloneType)
       val index_counter = Counter(en, n)._1
       when (en) {
         sram(index_counter) := in
