@@ -111,9 +111,9 @@ class FFTSpec extends FlatSpec with Matchers {
   it should "Fourier transform the input, fastly" in {
     //def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
     def getReal(): DspReal = DspReal(0.0)
-    for (i <- 2 until 7) {
+    for (i <- 2 until 7 by 2) {
       for (j <- 1 until i+1) {
-        for (k <- 0 until i+1) {
+        for (k <- 0 until i+1 by 2) {
           chisel3.iotesters.Driver(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
             c => new FFTTester(c)
           } should be (true)
