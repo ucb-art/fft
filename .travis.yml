@@ -6,5 +6,5 @@ sudo: false
 
 script:
   - cd dsp-framework; echo "Publishing the framework, this may take a while..."; ./update.bash > /dev/null; cd ..; echo "Done updating!"
-  - sbt travis:test
+  - sbt travis:test |& sed -e '/LoFirrtl/,/End of dependency graph/d'
 
