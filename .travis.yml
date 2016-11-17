@@ -5,6 +5,6 @@ language: scala
 sudo: false
 
 script:
-  - cd dsp-framework; ./update.bash; cd ..
+  - cd dsp-framework; echo "Publishing the framework, this may take a while..."; ./update.bash > /dev/null; cd ..; echo "Done updating!"
   - sbt travis:test
 
