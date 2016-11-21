@@ -128,7 +128,7 @@ object FFTVerilog extends App {
     import firrtl._
     def getReal(): DspReal = DspReal(0.0)
     //def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
-    val input = chisel3.Driver.emit(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 1024, p = 16, pipelineDepth=6)))
+    val input = chisel3.Driver.emit(() => new FFTPacked(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 8, p = 8)))
     val om = new ExecutionOptionsManager("FFT") with HasFirrtlOptions
     om.setTargetDirName("generated-src")
     om.setTopName("FFT")

@@ -163,3 +163,28 @@ class FFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]
     direct.io.in <> io.in
   }
 }
+
+
+
+// packing hack
+class FFTIOPacked[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None,
+  val config: FFTConfig = FFTConfig()) extends Bundle {
+
+  val in = Input(ValidWithSync(Wire(Vec(config.p, genIn)).asUInt))
+  val out = Output(ValidWithSync(Wire(Vec(config.p, genOut.getOrElse(genIn))).asUInt))
+}
+
+class FFTPacked[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
+  val config: FFTConfig = FFTConfig()) extends Module {
+
+  val io = IO(new FFTIOPacked(genIn, genOut, config))
+  val fft = Module(new FFT(genIn, genOut, genTwiddle, config))
+
+  fft.io.in.bits := Vec(config.p, genIn).fromBits(io.in.bits)
+  fft.io.in.valid := io.in.valid
+  fft.io.in.sync := io.in.sync
+
+  io.out.bits := fft.io.out.bits.asUInt
+  io.out.valid := fft.io.out.valid
+  io.out.sync := fft.io.out.sync
+}
