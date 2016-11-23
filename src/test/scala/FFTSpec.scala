@@ -19,7 +19,7 @@ import org.scalatest.Tag
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
-class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
+class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
 
   // bit reverse a value
   def bit_reverse(in: Int, width: Int): Int = {
@@ -114,7 +114,7 @@ class FFTSpec extends FlatSpec with Matchers {
     for (i <- 2 until 7 by 2) {
       for (j <- 1 until i+1) {
         for (k <- 0 until i+1 by 2) {
-          chisel3.iotesters.Driver(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
+          chisel3.iotesters.Driver(() => new FFTUnpacked(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
             c => new FFTTester(c)
           } should be (true)
         }
@@ -128,7 +128,7 @@ object FFTVerilog extends App {
     import firrtl._
     def getReal(): DspReal = DspReal(0.0)
     //def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
-    val input = chisel3.Driver.emit(() => new FFTPacked(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 8, p = 8)))
+    val input = chisel3.Driver.emit(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 8, p = 8)))
     val om = new ExecutionOptionsManager("FFT") with HasFirrtlOptions
     om.setTargetDirName("generated-src")
     om.setTopName("FFT")

@@ -147,7 +147,7 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
 // mixed version
 // note, this is always an n-point FFT
-class FFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
+class FFTUnpacked[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
   val config: FFTConfig = FFTConfig()) extends Module {
 
   val io = IO(new FFTIO(genIn, genOut, config))
@@ -174,11 +174,11 @@ class FFTIOPacked[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspCo
   val out = Output(ValidWithSync(Wire(Vec(config.p, genOut.getOrElse(genIn))).asUInt))
 }
 
-class FFTPacked[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
+class FFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
   val config: FFTConfig = FFTConfig()) extends Module {
 
   val io = IO(new FFTIOPacked(genIn, genOut, config))
-  val fft = Module(new FFT(genIn, genOut, genTwiddle, config))
+  val fft = Module(new FFTUnpacked(genIn, genOut, genTwiddle, config))
 
   fft.io.in.bits := Vec(config.p, genIn).fromBits(io.in.bits)
   fft.io.in.valid := io.in.valid
