@@ -1,4 +1,4 @@
-package craft
+package fft
 
 import org.accellera.spirit.v1685_2009.{File => SpiritFile, _}
 import javax.xml.bind.{JAXBContext, Marshaller}
@@ -136,7 +136,7 @@ object Generator extends App {
 
   def makeFileSets(factory: ObjectFactory): FileSets = {
     val fileName = new SpiritFile.Name
-    fileName.setValue(s"../verilog/${longName}.v")
+    fileName.setValue(s"${longName}.v")
 
     val file = new SpiritFile
     file.getFileType.add(factory.createFileFileType("verilogSource"))
@@ -183,7 +183,9 @@ object Generator extends App {
 
     val component = factory.createComponent(componentType)
 
-    val fos = new FileOutputStream(new File(td, s"$longName.xml"))
+    val of = new File(td, s"$longName.xml")
+    of.getParentFile().mkdirs()
+    val fos = new FileOutputStream(of)
     val context = JAXBContext.newInstance(classOf[ComponentInstance])
     val marshaller = context.createMarshaller()
     marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true)
