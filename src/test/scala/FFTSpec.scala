@@ -17,6 +17,11 @@ import scala.util.Random
 import scala.math._
 import org.scalatest.Tag
 
+import cde._
+import junctions._
+import uncore.tilelink._
+import uncore.coherence._
+
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
 class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
@@ -105,6 +110,26 @@ class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) 
 }
 
 class FFTSpec extends FlatSpec with Matchers {
+  implicit val p = Parameters.empty.alter(Map(
+	NastiKey -> NastiParameters(64, 64, 64),
+    PAddrBits -> 64,
+    CacheBlockOffsetBits -> 0,
+    AmoAluOperandBits -> 0,
+    TLId -> "FFT",
+    TLKey("FFT") ->
+        TileLinkParameters(
+          coherencePolicy = new MICoherence(
+            new NullRepresentation(1)),
+          nManagers = 1,
+          nCachingClients = 0,
+          nCachelessClients = 1,
+          maxClientXacts = 4,
+          maxClientsPerPort = 1,
+          maxManagerXacts = 1,
+          dataBeats = 8,
+          dataBits = 64)
+
+  ))
 
   // FFT
   behavior of "FFT"
@@ -124,6 +149,10 @@ class FFTSpec extends FlatSpec with Matchers {
 }
 
 object FFTVerilog extends App {
+  implicit val p = Parameters.empty.alter(Map(
+	NastiKey -> NastiParameters(64, 64, 64)
+  ))
+
   override def main(args: Array[String]): Unit = {
     import firrtl._
     def getReal(): DspReal = DspReal(0.0)
@@ -138,6 +167,10 @@ object FFTVerilog extends App {
 }
 
 object FFTSpec {
+  implicit val p = Parameters.empty.alter(Map(
+	NastiKey -> NastiParameters(64, 64, 64)
+  ))
+
   def getReal(): DspReal = new DspReal
   def main(args: Array[String]): Unit = {
     dsptools.Driver.executeFirrtlRepl(
