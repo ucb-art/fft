@@ -11,22 +11,36 @@ import dsptools.numbers.implicits._
 import dsptools.junctions._
 import dsptools.counters._
 import scala.math._
+import rocketchip.PeripheryUtils
+import junctions._
+import cde._
+import testchipip._
 
 // fast fourier transform io
 class FFTIO[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None,
-  val config: FFTConfig = FFTConfig()) extends Bundle {
+  val config: FFTConfig = FFTConfig())(implicit val p: Parameters) extends Bundle {
 
   val in = Input(ValidWithSync(Vec(config.p, genIn)))
   val out = Output(ValidWithSync(Vec(config.p, genOut.getOrElse(genIn))))
+  val axi = new NastiIO().flip
 }
 
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
 // direct form version
 // note, this is always a p-point FFT, though the twiddle factors will be different if p < n
 class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
-  val config: FFTConfig = FFTConfig()) extends Module {
+  val config: FFTConfig = FFTConfig())(implicit val p: Parameters) extends Module {
 
   val io = IO(new FFTIO(genIn, genOut, config))
+
+  val scrbuilder = new SCRBuilder("fft")
+  scrbuilder.addControl("fftControl")
+  scrbuilder.addStatus("fftStatus")
+  val scr = scrbuilder.generate(BigInt(0))
+  io.axi <> PeripheryUtils.convertTLtoAXI(scr.io.tl)
+  
+  // fft doesn't really need an SCR
+  scr.status("fftStatus") := scr.control("fftControl")
 
   // synchronize
   val sync = CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
@@ -86,7 +100,7 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
 // biplex pipelined version
 // note, this is always a bp-point FFT
 class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
-  val config: FFTConfig = FFTConfig()) extends Module {
+  val config: FFTConfig = FFTConfig())(implicit p: Parameters) extends Module {
 
   val io = IO(new FFTIO(genIn, genOut, config))
 
@@ -148,7 +162,7 @@ class BiplexFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
 // mixed version
 // note, this is always an n-point FFT
 class FFTUnpacked[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
-  val config: FFTConfig = FFTConfig()) extends Module {
+  val config: FFTConfig = FFTConfig())(implicit p: Parameters) extends Module {
 
   val io = IO(new FFTIO(genIn, genOut, config))
   
@@ -175,7 +189,7 @@ class FFTIOPacked[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspCo
 }
 
 class FFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
-  val config: FFTConfig = FFTConfig()) extends Module {
+  val config: FFTConfig = FFTConfig())(implicit p: Parameters) extends Module {
 
   val io = IO(new FFTIOPacked(genIn, genOut, config))
   val fft = Module(new FFTUnpacked(genIn, genOut, genTwiddle, config))

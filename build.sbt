@@ -13,11 +13,15 @@ resolvers ++= Seq(
 val defaultVersions = Map(
   "dsptools" -> "1.0",
   "chisel3" -> "3.1-SNAPSHOT",
-  "chisel-iotesters" -> "1.2-SNAPSHOT"
+  "chisel-iotesters" -> "1.2-SNAPSHOT",
+  "testchipip" -> "1.0"
+  //"rocketchip" -> "1.2"
   )
 
-libraryDependencies ++= Seq("dsptools", "chisel3","chisel-iotesters").map {
+libraryDependencies ++= Seq("dsptools", "chisel3", "chisel-iotesters", "testchipip").map {
   dep: String => "edu.berkeley.cs" %% dep % sys.props.getOrElse(dep + "Version", defaultVersions(dep)) }
+
+//libraryDependencies += "berkeley" %% "rocketchip" % "1.2"
 
 libraryDependencies += "org.spire-math" %% "spire" % "0.11.0"
 
@@ -37,3 +41,6 @@ lazy val fft = (project in file(".")).
 
 testOptions in TravisTest += Tests.Argument(TestFrameworks.ScalaTest, "-l", "edu.berkeley.tags.LocalTest")
 
+// this is bad juju
+unmanagedJars in Compile ++= 
+    (file("dsp-framework/lib/") * "*.jar").classpath
