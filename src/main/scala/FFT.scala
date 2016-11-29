@@ -6,6 +6,7 @@ package fft
 
 import chisel3.util._
 import chisel3._
+import chisel3.core.ExplicitCompileOptions
 import dsptools.numbers.{DspComplex, Real}
 import dsptools.numbers.implicits._
 import dsptools.junctions._
@@ -15,6 +16,10 @@ import rocketchip.PeripheryUtils
 import junctions._
 import cde._
 import testchipip._
+import uncore.tilelink._
+
+// shouldn't be needed, but evidently it is
+import  ExplicitCompileOptions.NotStrict
 
 // fast fourier transform io
 class FFTIO[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None,
@@ -22,30 +27,32 @@ class FFTIO[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[
 
   val in = Input(ValidWithSync(Vec(config.p, genIn)))
   val out = Output(ValidWithSync(Vec(config.p, genOut.getOrElse(genIn))))
-  val axi = new NastiIO().flip
+  //val axi = new NastiIO().flip()
+  val tl =new ClientUncachedTileLinkIO().flip
 }
 
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
 // direct form version
 // note, this is always a p-point FFT, though the twiddle factors will be different if p < n
 class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None, genTwiddle: => Option[DspComplex[T]] = None,
-  val config: FFTConfig = FFTConfig())(implicit val p: Parameters) extends Module {
+  val config: FFTConfig = FFTConfig())(implicit val p: Parameters) extends Module(){
 
   val io = IO(new FFTIO(genIn, genOut, config))
 
   val scrbuilder = new SCRBuilder("fft")
-  scrbuilder.addControl("fftControl")
+  scrbuilder.addControl("fftControl", 0.U)
   scrbuilder.addStatus("fftStatus")
   val scr = scrbuilder.generate(BigInt(0))
-  io.axi <> PeripheryUtils.convertTLtoAXI(scr.io.tl)
-  
-  // fft doesn't really need an SCR
-  scr.status("fftStatus") := scr.control("fftControl")
+  //io.axi <> PeripheryUtils.convertTLtoAXI(scr.io.tl.flip)
+  scr.io.tl <> io.tl
 
   // synchronize
   val sync = CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
   io.out.sync := ShiftRegisterMem(io.in.sync, config.direct_pipe, io.in.valid)
   io.out.valid := io.in.valid
+  // fft doesn't really need an SCR
+  //scr.status("fftStatus") := sync
+  io.out.valid := scr.control("fftControl")
 
   // wire up twiddles
   //val twiddle_rom = Vec(config.twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))

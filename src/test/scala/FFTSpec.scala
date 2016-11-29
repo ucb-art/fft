@@ -24,6 +24,30 @@ import uncore.coherence._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
+object LocalParams {
+  implicit val p = Parameters.empty.alter(Map(
+	NastiKey -> NastiParameters(64, 32, 1),
+    PAddrBits -> 32,
+    CacheBlockOffsetBits -> 6,
+    AmoAluOperandBits -> 64,
+    TLId -> "FFT",
+    TLKey("FFT") ->
+        TileLinkParameters(
+          coherencePolicy = new MICoherence(
+            new NullRepresentation(1)),
+          nManagers = 1,
+          nCachingClients = 0,
+          nCachelessClients = 1,
+          maxClientXacts = 4,
+          maxClientsPerPort = 1,
+          maxManagerXacts = 1,
+          dataBeats = 1,
+          dataBits = 64)
+  ))
+}
+
+import LocalParams._
+
 class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
 
   // bit reverse a value
@@ -110,26 +134,6 @@ class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) 
 }
 
 class FFTSpec extends FlatSpec with Matchers {
-  implicit val p = Parameters.empty.alter(Map(
-	NastiKey -> NastiParameters(64, 64, 64),
-    PAddrBits -> 64,
-    CacheBlockOffsetBits -> 0,
-    AmoAluOperandBits -> 0,
-    TLId -> "FFT",
-    TLKey("FFT") ->
-        TileLinkParameters(
-          coherencePolicy = new MICoherence(
-            new NullRepresentation(1)),
-          nManagers = 1,
-          nCachingClients = 0,
-          nCachelessClients = 1,
-          maxClientXacts = 4,
-          maxClientsPerPort = 1,
-          maxManagerXacts = 1,
-          dataBeats = 8,
-          dataBits = 64)
-
-  ))
 
   // FFT
   behavior of "FFT"
@@ -139,6 +143,12 @@ class FFTSpec extends FlatSpec with Matchers {
     for (i <- 2 until 7 by 2) {
       for (j <- 1 until i+1) {
         for (k <- 0 until i+1 by 2) {
+          val firrtlString = chisel3.Driver.emit(() => new FFTUnpacked(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k)))
+          import java.io._
+          val pw = new PrintWriter(new File(s"output.fir"))
+          pw.write(firrtlString)
+          pw.close
+
           chisel3.iotesters.Driver(() => new FFTUnpacked(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
             c => new FFTTester(c)
           } should be (true)
@@ -158,6 +168,7 @@ object FFTVerilog extends App {
     def getReal(): DspReal = DspReal(0.0)
     //def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
     val input = chisel3.Driver.emit(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 8, p = 8)))
+    println("FIRRTL:\n\n$input")
     val om = new ExecutionOptionsManager("FFT") with HasFirrtlOptions
     om.setTargetDirName("generated-src")
     om.setTopName("FFT")
