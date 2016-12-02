@@ -34,11 +34,11 @@ import dsptools._
 // create a new DSP Configuration
 class DspConfig extends Config(
   (pname, site, here) => pname match {
-    case BuildDSP => (q: Parameters) => {
-      //val dsp = Module(new FFT2[DspReal]()(p=p))
+    case BuildDSP => { (q: Parameters) => {
       implicit val p = q
-      val dsp = Module(new FFT(genIn=DspComplex(DspReal(0.0), DspReal(0.0)), config=new FFTConfig(n=8, p=8)))
-      ()
-    }
+      //val dsp = Module(new FFT2[DspReal]()(p=p))
+      Module(new FFT(genIn=DspComplex(DspReal(0.0), DspReal(0.0)), config=new FFTConfig(n=8, p=8)))
+      // ()
+    }}
     case _ => throw new CDEMatchError
   })

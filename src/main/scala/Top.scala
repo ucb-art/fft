@@ -32,17 +32,18 @@ class DspTop(p: Parameters) extends LazyModule {
 
 class DspTopBundle(p: Parameters) extends Bundle {}
 
-class DspTopModule[+L <: DspTop, +B <: DspTopBundle](p: Parameters, l: L, b: => B)
+class DspTopModule[+L <: DspTop, +B <: DspTopBundle](val p: Parameters, l: L, b: => B)
   extends LazyModuleImp(l) with DspModule {
     val io = IO(b)
   }
 
-case object BuildDSP extends Field[(Parameters) => Unit]
+case object BuildDSP extends Field[(Parameters) => Module]
 
 trait DspModule {
-  import LocalParams._
+  // import LocalParams._
 
-  p(BuildDSP)(p)
+  implicit val p: Parameters
+  val module = p(BuildDSP)(p)
 }
 
 object LocalParams {
