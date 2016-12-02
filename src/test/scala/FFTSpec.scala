@@ -145,18 +145,49 @@ class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) 
 }
 
 class FFT2Tester[T <: Data](c: FFT2[T]) extends StreamBlockTester[DspComplex[T], DspComplex[T], FFT2[T]](c) {
-  def streamIn = Seq(BigInt(1), BigInt(2), BigInt(3))
+  def doublesToBigInt(in: Seq[Double]): BigInt = {
+    in.reverse.foldLeft(BigInt(0)) {case (bi, dbl) =>
+      val new_bi = BigInt(java.lang.Double.doubleToLongBits(dbl))
+      (bi << 64) | new_bi
+    }
+  }
+  def rawStreamIn = Seq(
+    Seq(1.0) ++ Seq.fill(15){0.0},
+    Seq.fill(16){1.0},
+    Seq.fill(16){0.0}
+  )
+  def streamIn = rawStreamIn.map(doublesToBigInt)
 
-  step(9)
-  //axiWrite(0, 1)
+  pauseStream
+
+  axiWrite(8, 1)
 
   println(peek(c.io.out.sync).toString)
+
+  step(10)
+  axiWrite(8, 0)
+  println(peek(c.io.out.sync).toString)
+
+  playStream
+
+  step(10)
+  println(peek(c.io.out.sync).toString)
+
+  println("Input:")
+  rawStreamIn.foreach{ x => println(x.toString) }
+
+  println("Output:")
+  streamOut.foreach { x => (0 until 16).foreach { idx => {
+    val y = (x >> (64 * idx)) & 0xFFFFFFFFFFFFFFFFL
+    print(java.lang.Double.longBitsToDouble(y.toLong).toString + " ") }}
+    println()
+  }
 }
 
 class FFT2Spec extends FlatSpec with Matchers {
   behavior of "FFT2"
   val manager = new TesterOptionsManager {
-    testerOptions = TesterOptions(backendName = "firrtl", testerSeed = 7L)
+    testerOptions = TesterOptions(backendName = "verilator", testerSeed = 7L)
     interpreterOptions = InterpreterOptions(setVerbose = false, writeVCD = true)
   }
 

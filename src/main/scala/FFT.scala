@@ -205,7 +205,7 @@ class FFT2[T<:Data:Real](genTwiddle: => Option[DspComplex[T]] = None)(implicit p
   val config = p(FFTKey)
   val fft = Module(new FFTUnpacked(genIn(), Some(genOut()), genTwiddle, config))
 
-  addControl("fftControl", 3.U)
+  addControl("fftControl", 0.U)
   addStatus("fftStatus")
 
   fft.io.in <> unpacked_input
