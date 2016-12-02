@@ -7,6 +7,7 @@ package fft
 import chisel3.util._
 import chisel3._
 import chisel3.core.ExplicitCompileOptions
+import dsptools._
 import dsptools.numbers.{DspComplex, Real}
 import dsptools.numbers.implicits._
 import dsptools.junctions._
@@ -19,7 +20,7 @@ import testchipip._
 import uncore.tilelink._
 
 // shouldn't be needed, but evidently it is
-import  ExplicitCompileOptions.NotStrict
+// import  ExplicitCompileOptions.NotStrict
 
 // fast fourier transform io
 class FFTIO[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]] = None,
@@ -27,8 +28,6 @@ class FFTIO[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[
 
   val in = Input(ValidWithSync(Vec(config.p, genIn)))
   val out = Output(ValidWithSync(Vec(config.p, genOut.getOrElse(genIn))))
-  //val axi = new NastiIO().flip()
-  val tl =new ClientUncachedTileLinkIO().flip
 }
 
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
@@ -39,20 +38,10 @@ class DirectFFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComp
 
   val io = IO(new FFTIO(genIn, genOut, config))
 
-  val scrbuilder = new SCRBuilder("fft")
-  scrbuilder.addControl("fftControl", 0.U)
-  scrbuilder.addStatus("fftStatus")
-  val scr = scrbuilder.generate(BigInt(0))
-  //io.axi <> PeripheryUtils.convertTLtoAXI(scr.io.tl.flip)
-  scr.io.tl <> io.tl
-
   // synchronize
   val sync = CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
   io.out.sync := ShiftRegisterMem(io.in.sync, config.direct_pipe, io.in.valid)
   io.out.valid := io.in.valid
-  // fft doesn't really need an SCR
-  //scr.status("fftStatus") := sync
-  io.out.valid := scr.control("fftControl")
 
   // wire up twiddles
   //val twiddle_rom = Vec(config.twiddle.map(x => DspComplex.wire(implicitly[Real[T]].fromDouble(x(0)), implicitly[Real[T]].fromDouble(x(1)))))
@@ -208,4 +197,20 @@ class FFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]
   io.out.bits := fft.io.out.bits.asUInt
   io.out.valid := fft.io.out.valid
   io.out.sync := fft.io.out.sync
+}
+
+class FFT2[T<:Data:Real](genTwiddle: => Option[DspComplex[T]] = None)(implicit p: Parameters) 
+  extends StreamBlock[DspComplex[T], DspComplex[T]]()(p) {
+  val baseAddr = BigInt(0)
+  val config = p(FFTKey)
+  val fft = Module(new FFTUnpacked(genIn(), Some(genOut()), genTwiddle, config))
+
+  addControl("fftControl", 3.U)
+  addStatus("fftStatus")
+
+  fft.io.in <> unpacked_input
+  fft.io.in.sync := control("fftControl")(0)
+
+  unpacked_output <> fft.io.out
+  status("fftStatus") := unpacked_output.sync
 }

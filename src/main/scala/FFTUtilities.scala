@@ -6,6 +6,10 @@ import dsptools.numbers.{DspComplex, Real}
 import dsptools.numbers.implicits._
 import scala.math._
 
+import cde._
+
+case object FFTKey extends Field[FFTConfig]
+
 case class FFTConfig(n: Int = 8, // n-point FFT
                      p: Int = 8, // parallelism, or number of parallel inputs
                      pipelineDepth: Int = 0,

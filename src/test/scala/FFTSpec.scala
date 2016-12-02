@@ -7,7 +7,8 @@ import breeze.signal.{fourierTr}
 import breeze.linalg._
 import chisel3._
 import chisel3.util._
-import chisel3.iotesters.PeekPokeTester
+import chisel3.iotesters._
+import firrtl_interpreter.InterpreterOptions
 import dsptools.numbers.{DspReal, SIntOrder, SIntRing}
 import dsptools.{DspContext, DspTester, Grow}
 import org.scalatest.{FlatSpec, Matchers}
@@ -22,10 +23,15 @@ import junctions._
 import uncore.tilelink._
 import uncore.coherence._
 
+import dsptools._
+
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
 object LocalParams {
+  def getReal(): DspReal = DspReal(0.0).cloneType
   implicit val p = Parameters.empty.alter(Map(
+    FFTKey -> FFTConfig(n = 8, p = 8),
+    //NastiId -> "FFT",
 	NastiKey -> NastiParameters(64, 32, 1),
     PAddrBits -> 32,
     CacheBlockOffsetBits -> 6,
@@ -42,7 +48,12 @@ object LocalParams {
           maxClientsPerPort = 1,
           maxManagerXacts = 1,
           dataBeats = 1,
-          dataBits = 64)
+          dataBits = 64),
+    StreamBlockKey -> new StreamBlockParameters {
+      def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
+      override def genOut[T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
+      override val lanes = 8
+    }
   ))
 }
 
@@ -133,6 +144,29 @@ class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) 
   //draw(q, "imag spectrum", writer.FileOptions(overwrite=true))
 }
 
+class FFT2Tester[T <: Data](c: FFT2[T]) extends StreamBlockTester[DspComplex[T], DspComplex[T], FFT2[T]](c) {
+  def streamIn = Seq(BigInt(1), BigInt(2), BigInt(3))
+
+  step(9)
+  //axiWrite(0, 1)
+
+  println(peek(c.io.out.sync).toString)
+}
+
+class FFT2Spec extends FlatSpec with Matchers {
+  behavior of "FFT2"
+  val manager = new TesterOptionsManager {
+    testerOptions = TesterOptions(backendName = "firrtl", testerSeed = 7L)
+    interpreterOptions = InterpreterOptions(setVerbose = false, writeVCD = true)
+  }
+
+  it should "work with StreamBlockTester" in {
+    val dut = () => new FFT2[DspReal]()
+    chisel3.iotesters.Driver.execute(dut, manager) { c => new FFT2Tester(c) } should be (true)
+  }
+
+}
+
 class FFTSpec extends FlatSpec with Matchers {
 
   // FFT
@@ -158,17 +192,49 @@ class FFTSpec extends FlatSpec with Matchers {
   }
 }
 
-object FFTVerilog extends App {
-  implicit val p = Parameters.empty.alter(Map(
-	NastiKey -> NastiParameters(64, 64, 64)
-  ))
+object DumpVerilog extends App {
+  class A extends Module {
+    val io = IO(new Bundle {
+      val a = Output(Vec(1, UInt(32.W)))
+      val b = Input( Vec(1, UInt(32.W)))
+    })
+
+    val c = Wire(FixedPoint(32, 30))
+    c.fromBits(io.b(0))
+    io.a.fromBits(c)
+  }
+  import LocalParams._
 
   override def main(args: Array[String]): Unit = {
     import firrtl._
     def getReal(): DspReal = DspReal(0.0)
     //def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
-    val input = chisel3.Driver.emit(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 8, p = 8)))
-    println("FIRRTL:\n\n$input")
+    val input = chisel3.Driver.emit(() => new A)
+    println(s"FIRRTL:\n\n$input")
+    import java.io._
+    val pw = new PrintWriter(new File(s"output.fir"))
+    pw.write(input)
+    pw.close
+    val om = new ExecutionOptionsManager("A") with HasFirrtlOptions
+    om.setTargetDirName("generated-src")
+    om.setTopName("A")
+    om.firrtlOptions = om.firrtlOptions.copy(firrtlSource = Some(input))
+    println(firrtl.Driver.execute(om))
+  }
+}
+
+
+object FFTVerilog extends App {
+  import LocalParams._
+
+  override def main(args: Array[String]): Unit = {
+    import firrtl._
+    val input = chisel3.Driver.emit(() => new FFT2[DspReal]())
+    println(s"FIRRTL:\n\n$input")
+    import java.io._
+    val pw = new PrintWriter(new File(s"output.fir"))
+    pw.write(input)
+    pw.close
     val om = new ExecutionOptionsManager("FFT") with HasFirrtlOptions
     om.setTargetDirName("generated-src")
     om.setTopName("FFT")
@@ -178,9 +244,7 @@ object FFTVerilog extends App {
 }
 
 object FFTSpec {
-  implicit val p = Parameters.empty.alter(Map(
-	NastiKey -> NastiParameters(64, 64, 64)
-  ))
+  import LocalParams._
 
   def getReal(): DspReal = new DspReal
   def main(args: Array[String]): Unit = {
