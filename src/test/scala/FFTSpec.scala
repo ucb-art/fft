@@ -114,7 +114,7 @@ class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) 
   //draw(q, "imag spectrum", writer.FileOptions(overwrite=true))
 }
 
-class FFT2Tester[T <: Data](c: FFT2[T]) extends StreamBlockTester(c) {
+class FFT2Tester[T <: Data](c: FFT2[T]) extends DspBlockTester(c) {
   def doublesToBigInt(in: Seq[Double]): BigInt = {
     in.reverse.foldLeft(BigInt(0)) {case (bi, dbl) =>
       val new_bi = BigInt(java.lang.Double.doubleToLongBits(dbl))
@@ -129,8 +129,12 @@ class FFT2Tester[T <: Data](c: FFT2[T]) extends StreamBlockTester(c) {
   def streamIn = rawStreamIn.map(doublesToBigInt)
 
   pauseStream
+  val addrMap = testchipip.SCRAddressMap("FFT2").get
+  println("Addr Map:\n")
+  println(addrMap.map(_.toString).toString)
+  println(addrMap("fftControl").toString)
 
-  axiWrite(8, 1)
+  axiWrite(0, 1)
 
   println(peek(c.io.out.sync).toString)
 
@@ -161,7 +165,7 @@ class FFT2Spec extends FlatSpec with Matchers {
     interpreterOptions = InterpreterOptions(setVerbose = false, writeVCD = true)
   }
 
-  it should "work with StreamBlockTester" in {
+  it should "work with DspBlockTester" in {
     val dut = () => new FFT2[DspReal]()
     chisel3.iotesters.Driver.execute(dut, manager) { c => new FFT2Tester(c) } should be (true)
   }

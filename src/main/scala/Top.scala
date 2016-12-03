@@ -68,7 +68,7 @@ object LocalParams {
           maxManagerXacts = 1,
           dataBeats = 1,
           dataBits = 64),
-    StreamBlockKey -> StreamBlockParameters(1024, 1024),
+    DspBlockKey -> DspBlockParameters(-4, -4),
     GenKey -> new GenParameters {
       def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
       override def genOut[T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]

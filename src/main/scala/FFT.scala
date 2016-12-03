@@ -199,8 +199,8 @@ class FFT[T<:Data:Real](genIn: => DspComplex[T], genOut: => Option[DspComplex[T]
   io.out.sync := fft.io.out.sync
 }
 
-class FFT2[T<:Data:Real](genTwiddle: => Option[DspComplex[T]] = None)(implicit p: Parameters) 
-  extends StreamBlock()(p) with HasGenParameters[DspComplex[T], DspComplex[T]] {
+class FFT2[T<:Data:Real](genTwiddle: => Option[DspComplex[T]] = None)
+  (implicit p: Parameters) extends GenDspBlock[DspComplex[T], DspComplex[T]]()(p) {
   val baseAddr = BigInt(0)
   val config = p(FFTKey)
   val fft = Module(new FFTUnpacked(genIn(), Some(genOut()), genTwiddle, config))
@@ -213,5 +213,5 @@ class FFT2[T<:Data:Real](genTwiddle: => Option[DspComplex[T]] = None)(implicit p
 
   println(lanesOut)
   unpackOutput(lanesOut, genOut()) <> fft.io.out
-  status("fftStatus") := fft.io.out.sync // unpackOutput.sync
+  status("fftStatus") := fft.io.out.sync
 }
