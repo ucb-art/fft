@@ -27,36 +27,6 @@ import dsptools._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
-object LocalParams {
-  def getReal(): DspReal = DspReal(0.0).cloneType
-  implicit val p = Parameters.empty.alter(Map(
-    FFTKey -> FFTConfig(n = 8, p = 8),
-    //NastiId -> "FFT",
-	NastiKey -> NastiParameters(64, 32, 1),
-    PAddrBits -> 32,
-    CacheBlockOffsetBits -> 6,
-    AmoAluOperandBits -> 64,
-    TLId -> "FFT",
-    TLKey("FFT") ->
-        TileLinkParameters(
-          coherencePolicy = new MICoherence(
-            new NullRepresentation(1)),
-          nManagers = 1,
-          nCachingClients = 0,
-          nCachelessClients = 1,
-          maxClientXacts = 4,
-          maxClientsPerPort = 1,
-          maxManagerXacts = 1,
-          dataBeats = 1,
-          dataBits = 64),
-    StreamBlockKey -> new StreamBlockParameters {
-      def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
-      override def genOut[T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
-      override val lanes = 8
-    }
-  ))
-}
-
 import LocalParams._
 
 class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
@@ -144,7 +114,7 @@ class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) 
   //draw(q, "imag spectrum", writer.FileOptions(overwrite=true))
 }
 
-class FFT2Tester[T <: Data](c: FFT2[T]) extends StreamBlockTester[DspComplex[T], DspComplex[T], FFT2[T]](c) {
+class FFT2Tester[T <: Data](c: FFT2[T]) extends StreamBlockTester(c) {
   def doublesToBigInt(in: Seq[Double]): BigInt = {
     in.reverse.foldLeft(BigInt(0)) {case (bi, dbl) =>
       val new_bi = BigInt(java.lang.Double.doubleToLongBits(dbl))
