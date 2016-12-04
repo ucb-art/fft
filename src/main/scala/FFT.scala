@@ -20,7 +20,7 @@ import testchipip._
 import uncore.tilelink._
 
 // fast fourier transform io
-class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasGenDspParameters[DspComplex[T], DspComplex[T]] {
+class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasGenParameters[DspComplex[T], DspComplex[T]] {
 
   val in = Input(ValidWithSync(Vec(lanesIn, genIn())))
   val out = Output(ValidWithSync(Vec(lanesOut, genOut())))
@@ -29,7 +29,7 @@ class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasG
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
 // direct form version
 // note, this is always a p-point FFT, though the twiddle factors will be different if p < n
-class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends GenDspBlock[DspComplex[T], DspComplex[T]]()(p) {
+class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
   val config = p(FFTKey)
 
   val io = IO(new FFTIO[T])
@@ -87,7 +87,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends GenDspBlock[
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
 // biplex pipelined version
 // note, this is always a bp-point FFT
-class BiplexFFT[T<:Data:Real]()(implicit p: Parameters) extends GenDspBlock[DspComplex[T], DspComplex[T]]()(p) {
+class BiplexFFT[T<:Data:Real]()(implicit p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
   val config = p(FFTKey)
 
   val io = IO(new FFTIO[T])
@@ -145,7 +145,7 @@ class BiplexFFT[T<:Data:Real]()(implicit p: Parameters) extends GenDspBlock[DspC
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
 // mixed version
 // note, this is always an n-point FFT
-class FFT[T<:Data:Real]()(implicit p: Parameters) extends GenDspBlock[DspComplex[T], DspComplex[T]]()(p) {
+class FFT[T<:Data:Real]()(implicit p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
   val config = p(FFTKey)
 
   val io = IO(new FFTIO[T])
