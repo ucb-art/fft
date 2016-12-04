@@ -27,9 +27,9 @@ import dsptools._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
-import LocalParams._
+// import LocalParams._
 
-class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
+class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
 
   // bit reverse a value
   def bit_reverse(in: Int, width: Int): Int = {

@@ -14,7 +14,7 @@ object Butterfly {
   {
     require(in.length == 2, "Butterfly requires two data inputs")   
     val product = in(1)*twiddle
-    List(in(0)+product, in(0)-product)
+    Seq(in(0)+product, in(0)-product)
   }
 }
 

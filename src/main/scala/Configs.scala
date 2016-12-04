@@ -73,11 +73,14 @@ class DspConfig extends Config(
 
 case object FFTKey extends Field[FFTConfig[DspReal]]
 
+trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
+   def genTwiddle: Option[T] = None
+}
+
 case class FFTConfig[T<:Data:Real](n: Int = 8, // n-point FFT
                                    pipelineDepth: Int = 0,
-                                   real: Boolean = false, // real inputs?
-                                   genTwiddle: Option[DspComplex[T]] = None
-                                  )(implicit val p: Parameters) extends HasGenParameters[DspComplex[T], DspComplex[T]] {
+                                   real: Boolean = false // real inputs?
+                                  )(implicit val p: Parameters) extends HasFFTGenParameters[DspComplex[T]] {
   assert(lanesIn == lanesOut, "FFT must have an equal number of input and output lanes")
   assert(n >= 4, "For an n-point FFT, n must be 4 or more")
   assert(lanesIn >= 2, "Must have at least 2 parallel inputs")

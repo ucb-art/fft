@@ -29,7 +29,7 @@ class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasG
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
 // direct form version
 // note, this is always a p-point FFT, though the twiddle factors will be different if p < n
-class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
+class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasFFTGenParameters[DspComplex[T]] {
   val config = p(FFTKey)
 
   val io = IO(new FFTIO[T])
@@ -43,12 +43,13 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   val indices_rom = Vec(config.dindices.map(x => UInt(x)))
   // TODO: make this not a multiply
   val start = sync*UInt(lanesIn-1)
-  val twiddle = Vec.fill(lanesIn-1)(Wire(config.genTwiddle.getOrElse(genIn())))
+  val a: DspComplex[T] = genTwiddle.get
+  val twiddle: Vec[DspComplex[T]] = Vec.fill(lanesIn-1)(Wire(genTwiddle.getOrElse(genIn())))
   // special case when n = 4, because the pattern breaks down
   if (config.n == 4) {
-    twiddle := (0 until lanesIn-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(config.twiddle_rom(0)), config.twiddle_rom(0)))
+    twiddle := Vec((0 until lanesIn-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(config.twiddle_rom(0)), config.twiddle_rom(0))))
   } else {
-    twiddle := (0 until lanesIn-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(config.twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4)-1, 0))), config.twiddle_rom(indices_rom(start+UInt(x)))))
+    twiddle := Vec((0 until lanesIn-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(config.twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4)-1, 0))), config.twiddle_rom(indices_rom(start+UInt(x))))))
   }
 
   // p-point decimation-in-time direct form FFT with inputs in normal order (outputs bit reversed)
@@ -73,7 +74,11 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
       val start = ((j % skip) + floor(j/skip) * skip*2).toInt
 
       // hook it up
-      List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(stage_outputs(i)(start), stage_outputs(i)(start+skip)), ShiftRegisterMem(twiddle(indices(j)(i)), config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(lanesIn)-i).foldLeft(0)(_+_), io.in.valid))).foreach { x =>
+      val outputs = List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip))
+      val shr_delay         = config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(lanesIn)-i).foldLeft(0)(_+_)
+      val shr               = ShiftRegisterMem[DspComplex[T]](twiddle(indices(j)(i)), shr_delay, io.in.valid)
+      val butterfly_outputs = Butterfly[T](Seq(stage_outputs(i)(start), stage_outputs(i)(start+skip)), shr)
+      outputs.zip(butterfly_outputs) .foreach { x =>
         x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), io.in.valid)
       }
 
@@ -87,7 +92,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
 // biplex pipelined version
 // note, this is always a bp-point FFT
-class BiplexFFT[T<:Data:Real]()(implicit p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
+class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasFFTGenParameters[DspComplex[T]] {
   val config = p(FFTKey)
 
   val io = IO(new FFTIO[T])
@@ -103,7 +108,7 @@ class BiplexFFT[T<:Data:Real]()(implicit p: Parameters) extends Module with HasG
   // wire up twiddles
   val indices_rom = Vec(config.bindices.map(x => UInt(x)))
   val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegisterMem(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_), io.in.valid)(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
-  val twiddle = Vec.fill(log2Up(config.bp))(Wire(config.genTwiddle.getOrElse(genIn())))
+  val twiddle: Vec[DspComplex[T]] = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genIn())))
   // special cases
   if (config.n == 4) {
     twiddle := Vec((0 until log2Up(config.bp)).map(x => Mux(indices(x)(log2Ceil(config.n/4)), DspComplex.divideByJ(config.twiddle_rom(0)), config.twiddle_rom(0))))
@@ -129,9 +134,9 @@ class BiplexFFT[T<:Data:Real]()(implicit p: Parameters) extends Module with HasG
       // last stage just has one extra permutation, no butterfly
       val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegisterMem(stage_outputs(i)(start+skip), stage_delays(i), io.in.valid)), ShiftRegisterMem(sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).reduceRight(_+_)}, io.in.valid))
       if (i == log2Up(config.bp)) {
-        List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(List(ShiftRegisterMem(mux_out(0), stage_delays(i), io.in.valid), mux_out(1))).foreach { x => x._1 := x._2 }
+        Seq(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Seq(ShiftRegisterMem(mux_out(0), stage_delays(i), io.in.valid), mux_out(1))).foreach { x => x._1 := x._2 }
       } else {
-        List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(List(ShiftRegisterMem(mux_out(0), stage_delays(i), io.in.valid), mux_out(1)), twiddle(i))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i), io.in.valid) }
+        Seq(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(Seq(ShiftRegisterMem(mux_out(0), stage_delays(i), io.in.valid), mux_out(1)), twiddle(i))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i), io.in.valid) }
       }
 
     }
@@ -145,7 +150,7 @@ class BiplexFFT[T<:Data:Real]()(implicit p: Parameters) extends Module with HasG
 // fast fourier transform - cooley-tukey algorithm, decimation-in-time
 // mixed version
 // note, this is always an n-point FFT
-class FFT[T<:Data:Real]()(implicit p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
+class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
   val config = p(FFTKey)
 
   val io = IO(new FFTIO[T])
