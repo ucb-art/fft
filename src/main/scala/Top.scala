@@ -30,50 +30,17 @@ class DspTop(p: Parameters) extends LazyModule {
   override lazy val module = Module(new DspTopModule(p, this, new DspTopBundle(p)))
 }
 
-class DspTopBundle(p: Parameters) extends Bundle {}
+class DspTopBundle(p: Parameters) extends DspBlockIO()(p) {}
 
 class DspTopModule[+L <: DspTop, +B <: DspTopBundle](val p: Parameters, l: L, b: => B)
   extends LazyModuleImp(l) with DspModule {
     val io = IO(b)
+    io <> module.io
   }
 
-case object BuildDSP extends Field[(Parameters) => Module]
+case object BuildDSP extends Field[(Parameters) => DspBlock]
 
 trait DspModule {
-  // import LocalParams._
-
   implicit val p: Parameters
   val module = p(BuildDSP)(p)
-}
-
-object LocalParams {
-  def getReal(): DspReal = DspReal(0.0).cloneType
-  implicit val p = Parameters.empty.alter(Map(
-    FFTKey -> FFTConfig(n = 8, p = 8),
-    //NastiId -> "FFT",
-	NastiKey -> NastiParameters(64, 32, 1),
-    PAddrBits -> 32,
-    CacheBlockOffsetBits -> 6,
-    AmoAluOperandBits -> 64,
-    TLId -> "FFT",
-    TLKey("FFT") ->
-        TileLinkParameters(
-          coherencePolicy = new MICoherence(
-            new NullRepresentation(1)),
-          nManagers = 1,
-          nCachingClients = 0,
-          nCachelessClients = 1,
-          maxClientXacts = 4,
-          maxClientsPerPort = 1,
-          maxManagerXacts = 1,
-          dataBeats = 1,
-          dataBits = 64),
-    DspBlockKey -> DspBlockParameters(-4, -4),
-    GenKey -> new GenParameters {
-      def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
-      override def genOut[T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
-      val lanesIn = 8
-      override val lanesOut = 8
-    }
-  ))
 }
