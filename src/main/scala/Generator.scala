@@ -11,6 +11,7 @@ import rocketchip._
 import junctions._
 import cde.Parameters
 import dsptools.junctions._
+import dsptools._
 
 // includes IPXact generation
 trait DspGeneratorApp extends GeneratorApp {
@@ -155,10 +156,8 @@ trait DspGeneratorApp extends GeneratorApp {
   }
 
   def generateIPXact {
-    val bits_in = 1000
-    val bits_out = 1000
-    //val config = p(FFTKey)
-    //val bits_out = p(FFTKey)
+    val bits_in = params(DspBlockKey).inputWidth
+    val bits_out = params(DspBlockKey).outputWidth
     val factory = new ObjectFactory
 
     val busInterfaces = new BusInterfaces
@@ -200,7 +199,7 @@ trait DspGeneratorApp extends GeneratorApp {
 }
 
 object Generator extends DspGeneratorApp {
-  val longName = names.topModuleProject + "." + names.configs
+  val longName = names.fullTopModuleClass + "." + names.configs
   generateFirrtl
-  //generateIPXact
+  generateIPXact
 }

@@ -1,13 +1,5 @@
 package fft
 
-//import cde._
-//import testchipip.WithSerialAdapter
-//import uncore.tilelink.ClientUncachedTileLinkIO
-//import rocketchip.PeripheryUtils
-//import chisel3._
-//import dsptools.numbers.{DspReal, DspComplex, Real}
-//import dsptools.numbers.implicits._
-
 import breeze.math.{Complex}
 import breeze.signal.{fourierTr}
 import breeze.linalg._
@@ -60,7 +52,7 @@ class DspConfig extends Config(
           maxManagerXacts = 1,
           dataBeats = 1,
           dataBits = 64)
-    case DspBlockKey => DspBlockParameters(-4, -4)
+    case DspBlockKey => DspBlockParameters(1024, 1024)
     case GenKey => new GenParameters {
       def getReal(): DspReal = DspReal(0.0).cloneType
       def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
@@ -71,7 +63,7 @@ class DspConfig extends Config(
     case _ => throw new CDEMatchError
   })
 
-case object FFTKey extends Field[FFTConfig[DspReal]]
+case object FFTKey extends Field[(Parameters) => FFTConfig[DspReal]]
 
 trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
    def genTwiddle: Option[T] = None

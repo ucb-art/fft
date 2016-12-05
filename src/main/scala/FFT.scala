@@ -30,7 +30,7 @@ class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasG
 // direct form version
 // note, this is always a p-point FFT, though the twiddle factors will be different if p < n
 class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasFFTGenParameters[DspComplex[T]] {
-  val config = p(FFTKey)
+  val config = p(FFTKey)(p)
 
   val io = IO(new FFTIO[T])
 
@@ -43,8 +43,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   val indices_rom = Vec(config.dindices.map(x => UInt(x)))
   // TODO: make this not a multiply
   val start = sync*UInt(lanesIn-1)
-  val a: DspComplex[T] = genTwiddle.get
-  val twiddle: Vec[DspComplex[T]] = Vec.fill(lanesIn-1)(Wire(genTwiddle.getOrElse(genIn())))
+  val twiddle = Vec.fill(lanesIn-1)(Wire(genTwiddle.getOrElse(genIn())))
   // special case when n = 4, because the pattern breaks down
   if (config.n == 4) {
     twiddle := Vec((0 until lanesIn-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(config.twiddle_rom(0)), config.twiddle_rom(0))))
@@ -93,7 +92,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
 // biplex pipelined version
 // note, this is always a bp-point FFT
 class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasFFTGenParameters[DspComplex[T]] {
-  val config = p(FFTKey)
+  val config = p(FFTKey)(p)
 
   val io = IO(new FFTIO[T])
 
@@ -108,7 +107,7 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   // wire up twiddles
   val indices_rom = Vec(config.bindices.map(x => UInt(x)))
   val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegisterMem(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_), io.in.valid)(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
-  val twiddle: Vec[DspComplex[T]] = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genIn())))
+  val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genIn())))
   // special cases
   if (config.n == 4) {
     twiddle := Vec((0 until log2Up(config.bp)).map(x => Mux(indices(x)(log2Ceil(config.n/4)), DspComplex.divideByJ(config.twiddle_rom(0)), config.twiddle_rom(0))))
@@ -151,7 +150,7 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
 // mixed version
 // note, this is always an n-point FFT
 class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
-  val config = p(FFTKey)
+  val config = p(FFTKey)(p)
 
   val io = IO(new FFTIO[T])
   
