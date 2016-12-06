@@ -202,63 +202,14 @@ class FFTSpec extends FlatSpec with Matchers {
   */
 }
 
-object DumpVerilog extends App {
-  class A extends Module {
-    val io = IO(new Bundle {
-      val a = Output(Vec(1, UInt(32.W)))
-      val b = Input( Vec(1, UInt(32.W)))
-    })
-
-    val c = Wire(FixedPoint(32, 30))
-    c.fromBits(io.b(0))
-    io.a.fromBits(c)
-  }
-
-  override def main(args: Array[String]): Unit = {
-    import firrtl._
-    def getReal(): DspReal = DspReal(0.0)
-    //def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
-    val input = chisel3.Driver.emit(() => new A)
-    println(s"FIRRTL:\n\n$input")
-    import java.io._
-    val pw = new PrintWriter(new File(s"output.fir"))
-    pw.write(input)
-    pw.close
-    val om = new ExecutionOptionsManager("A") with HasFirrtlOptions
-    om.setTargetDirName("generated-src")
-    om.setTopName("A")
-    om.firrtlOptions = om.firrtlOptions.copy(firrtlSource = Some(input))
-    println(firrtl.Driver.execute(om))
-  }
-}
-
-
-object FFTVerilog extends App {
-  implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
-
-  override def main(args: Array[String]): Unit = {
-    import firrtl._
-    val input = chisel3.Driver.emit(() => new FFTWrapper[DspReal]())
-    println(s"FIRRTL:\n\n$input")
-    import java.io._
-    val pw = new PrintWriter(new File(s"output.fir"))
-    pw.write(input)
-    pw.close
-    val om = new ExecutionOptionsManager("FFT") with HasFirrtlOptions
-    om.setTargetDirName("generated-src")
-    om.setTopName("FFT")
-    om.firrtlOptions = om.firrtlOptions.copy(firrtlSource = Some(input))
-    println(firrtl.Driver.execute(om))
-  }
-}
-
-object FFTSpec {
+// execute FIRRTL Repl for testing
+object DspRepl {
   implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
 
   def getReal(): DspReal = new DspReal
   def main(args: Array[String]): Unit = {
     dsptools.Driver.executeFirrtlRepl(
-      () => new FFT[DspReal]()
+      () => new FFT[DspReal]()(p)
     )
   }
 }

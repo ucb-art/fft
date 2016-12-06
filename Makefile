@@ -11,13 +11,12 @@ FIRRTL ?= java -Xmx2G -Xss8M -cp $(FIRRTL_JAR) firrtl.Driver
 CHISEL_ARGS ?= 
 build_dir ?= generated-src
 PROJECT ?= fft
-MODEL ?= FFT2
+MODEL ?= TestHarness
 CFG_PROJECT ?= $(PROJECT)
 CONFIG ?= DspConfig
 
 
-#$(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir: $(rocketchip_stamp) $(extra_stamps) $(call lookup_scala_srcs,$(base_dir)/src/main/scala)
-$(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir:
+$(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir: $(rocketchip_stamp) $(extra_stamps) $(call lookup_scala_srcs,$(base_dir)/src/main/scala)
 	mkdir -p $(build_dir)
 	cd $(base_dir) && $(SBT) "run-main $(PROJECT).Generator $(CHISEL_ARGS) $(build_dir) $(PROJECT) $(MODEL) $(CFG_PROJECT) $(CONFIG)"
 
