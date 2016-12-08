@@ -21,7 +21,15 @@ import junctions._
 import uncore.tilelink._
 import uncore.coherence._
 
+import fft.Generator.params
+
 import dsptools._
+
+import scala.collection.mutable.Map
+
+trait HasIPXACTParameters {
+  def getIPXACTParameters: Map[String, String]
+}
 
 // create a new DSP Configuration
 class DspConfig extends Config(
@@ -61,7 +69,39 @@ class DspConfig extends Config(
       override val lanesOut = 8
     }
     case _ => throw new CDEMatchError
-  })
+  }) with HasIPXACTParameters {
+  def getIPXACTParameters: Map[String, String] = {
+    // Get unadulterated, top level parameters.
+    val parameterList = List[Field[_]](TLId, PAddrBits)
+    val parameterMap = parameterList.foldLeft(Map[String, String]()) { (m, s) => m(s.toString) = params(s).toString; m }
+
+    // Conjure up some IPXACT synthsized parameters.
+    parameterMap ++= List(("IsComplex", "0"), ("IsSigned", "1"))
+
+    // Get some nested parameters.
+    val (nastiDataBits, nastiAddrBits, nastiIdBits) = params(NastiKey) match {
+      case NastiParameters(d: Int, a: Int, i: Int) => (d, a, i)
+    }
+    parameterMap ++= List(("nastiDataBits", nastiDataBits.toString))
+
+    // Get some nested parameters, one level deeper.
+    val (nManagers, dataBits) = params(TLKey(params(TLId))) match {
+      case TileLinkParameters(    coherencePolicy: CoherencePolicy,
+      nManagers: Int,
+      nCachingClients: Int,
+      nCachelessClients: Int,
+      maxClientXacts: Int,
+      maxClientsPerPort: Int,
+      maxManagerXacts: Int,
+      dataBits: Int,
+      dataBeats: Int,
+      overrideDataBitsPerBeat: Option[Int]
+    ) => (nManagers.toString, dataBits)
+    }
+    parameterMap ++= List(("nManagers", nManagers.toString), ("dataBits", dataBits.toString))
+    parameterMap
+  }
+}
 
 case object FFTKey extends Field[(Parameters) => FFTConfig[DspReal]]
 

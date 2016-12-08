@@ -1,7 +1,7 @@
 package fft
 
 import util.GeneratorApp
-import org.accellera.spirit.v1685_2009.{File => SpiritFile, _}
+import org.accellera.spirit.v1685_2009.{File => SpiritFile, Parameters => SpiritParameters, _}
 import javax.xml.bind.{JAXBContext, Marshaller}
 import java.io.{File, FileOutputStream}
 import scala.collection.JavaConverters
@@ -155,6 +155,21 @@ trait DspGeneratorApp extends GeneratorApp {
     fileSets
   }
 
+  def makeParameters(factory: ObjectFactory): SpiritParameters = {
+    val parameters = new SpiritParameters()
+    val config = new DspConfig()
+    for ( (name, value) <- config.getIPXACTParameters) {
+      println("parameter: %s, value: %s".format(name, value))
+      val nameValuePairType = new NameValuePairType
+      nameValuePairType.setName(name)
+      val nameValuePairTypeValue = new NameValuePairType.Value
+      nameValuePairTypeValue.setValue(value)
+      nameValuePairType.setValue(nameValuePairTypeValue)
+      parameters.getParameter().add(nameValuePairType)
+    }
+    parameters
+  }
+
   def generateIPXact {
     val bits_in = params(DspBlockKey).inputWidth
     val bits_out = params(DspBlockKey).outputWidth
@@ -185,6 +200,7 @@ trait DspGeneratorApp extends GeneratorApp {
     componentType.setBusInterfaces(busInterfaces)
     componentType.setModel(model)
     componentType.setFileSets(makeFileSets(factory))
+    componentType.setParameters(makeParameters(factory))
 
     val component = factory.createComponent(componentType)
 
