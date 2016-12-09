@@ -67,7 +67,7 @@ case class FFTConfig(n: Int = 8, // n-point FFT
     temp = temp.map(x => x.drop(1).splitAt((x.size-1)/2)).flatMap(x => Array(x._1, x._2))
     q = q/2
   }
-  val dindices = (0 until temp.size).map(x => temp(bit_reverse(x, log2Up(bp)))).flatten
+  val dindices = (0 until temp.size).map(x => temp((x*2)%temp.size+x*2/temp.size)).flatten
 }
 
 // single radix-2 butterfly
@@ -101,6 +101,7 @@ object ShiftRegisterMem {
   //   inputs twice the width of "in" and depth "n/2". I assume you
   //   want only 1 SRAM by default.
 
+  // TODO: can we use SeqMem instead of Mem?
   def apply[T <: Data](in: T, n: Int, en: Bool = Bool(true), use_sp_mem: Boolean = false, use_two_srams: Boolean = false, name: String = null): T =
   {
     if (n%2 == 1 && use_sp_mem && !use_two_srams) {
@@ -111,8 +112,8 @@ object ShiftRegisterMem {
     } else if (use_sp_mem) {
       val out = in.cloneType
       if (use_two_srams || n%2 == 1) {
-        val sram0 = SeqMem(n, in.cloneType)
-        val sram1 = SeqMem(n, in.cloneType)
+        val sram0 = Mem(n, in.cloneType)
+        val sram1 = Mem(n, in.cloneType)
         if (name != null) {
           println(s"No name support yet")
           //sram0.setName(name + "_0")
@@ -137,7 +138,7 @@ object ShiftRegisterMem {
         out
       }
       else {
-        val sram = SeqMem(n/2, Vec(in, in))
+        val sram = Mem(n/2, Vec(in, in))
         if (name != null) {
           println(s"Name support not implemented")
           //sram.setName(name)
@@ -165,7 +166,7 @@ object ShiftRegisterMem {
         out
       }
     } else {
-      val sram = SeqMem(n, in.cloneType)
+      val sram = Mem(n, in.cloneType)
       val index_counter = Counter(en, n)._1
       when (en) {
         sram(index_counter) := in

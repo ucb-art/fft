@@ -340,7 +340,7 @@ hs_err_pid*
 test_run_dir/
 
 # rocket-chip
-lib
+/lib
 
 # custom
 /generated-src
