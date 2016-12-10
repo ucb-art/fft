@@ -31,6 +31,8 @@ trait HasIPXACTParameters {
   def getIPXACTParameters: Map[String, String]
 }
 
+case object FFTSize extends Field[Int]
+
 // create a new DSP Configuration
 class DspConfig extends Config(
   (pname, site, here) => pname match {
@@ -38,9 +40,10 @@ class DspConfig extends Config(
       implicit val p = q
       Module(new FFTWrapper[DspReal])
     }}
+    case FFTSize => 8
     case FFTKey => { (q: Parameters) => { 
       implicit val p = q
-      FFTConfig[DspReal](n = 8)
+      FFTConfig[DspReal](n = site(FFTSize))
     }}
     //NastiId => "FFT"
 	  case NastiKey => NastiParameters(64, 32, 1)
@@ -75,9 +78,6 @@ class DspConfig extends Config(
     val parameterList = List[Field[_]](TLId, PAddrBits)
     val parameterMap = parameterList.foldLeft(Map[String, String]()) { (m, s) => m(s.toString) = params(s).toString; m }
 
-    // Conjure up some IPXACT synthsized parameters.
-    parameterMap ++= List(("IsComplex", "0"), ("IsSigned", "1"))
-
     // Get some nested parameters.
     val (nastiDataBits, nastiAddrBits, nastiIdBits) = params(NastiKey) match {
       case NastiParameters(d: Int, a: Int, i: Int) => (d, a, i)
@@ -99,6 +99,11 @@ class DspConfig extends Config(
     ) => (nManagers.toString, dataBits)
     }
     parameterMap ++= List(("nManagers", nManagers.toString), ("dataBits", dataBits.toString))
+
+    // Conjure up some IPXACT synthsized parameters.
+    val fftSize = params(FFTSize)
+    parameterMap ++= List(("IsComplex", "0"), ("IsSigned", "1"), ("FFTSize", fftSize.toString))
+
     parameterMap
   }
 }
