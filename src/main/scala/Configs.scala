@@ -37,8 +37,7 @@ case object FFTSize extends Field[Int]
 class DspConfig extends Config(
   (pname, site, here) => pname match {
     case BuildDSP => { (q: Parameters) => {
-      implicit val p = q
-      Module(new FFTWrapper[DspReal])
+      Module(new FFTWrapper[DspReal]()(DspRealRealImpl, q))
     }}
     case FFTSize => 8
     case FFTKey => { (q: Parameters) => { 

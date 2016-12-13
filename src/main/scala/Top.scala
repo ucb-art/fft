@@ -30,7 +30,7 @@ class DspTop(p: Parameters) extends LazyModule {
   override lazy val module = Module(new DspTopModule(p, this, new DspTopBundle(p)))
 }
 
-class DspTopBundle(p: Parameters) extends DspBlockIO()(p) {}
+class DspTopBundle(p: Parameters) extends BasicDspBlockIO()(p) {}
 
 class DspTopModule[+L <: DspTop, +B <: DspTopBundle](val p: Parameters, l: L, b: => B)
   extends LazyModuleImp(l) with DspModule {
@@ -41,6 +41,6 @@ class DspTopModule[+L <: DspTop, +B <: DspTopBundle](val p: Parameters, l: L, b:
 case object BuildDSP extends Field[(Parameters) => DspBlock]
 
 trait DspModule {
-  implicit val p: Parameters
+  val p: Parameters
   val module = p(BuildDSP)(p)
 }
