@@ -76,7 +76,6 @@ class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends 
         val subindex = output_counter*2*parallelism+index
         val bin = (bit_reverse(subindex%fft_size+subindex/fft_size*parallelism, log2Up(fft_size))) 
         val value = dspPeek(port).right.get
-        val mag = value.abs
         output(bin) = dspPeek(port).right.get 
       }}
       output_counter = output_counter + 1
@@ -90,8 +89,6 @@ class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends 
     if (chisel != ref) {
       val epsilon = 1e-12
       val err = (chisel-ref).abs/(ref.abs+epsilon)
-      val refabs = ref.abs
-      val chiselabs = chisel.abs
       errs(index) = err
       assert(err < epsilon || ref.abs < epsilon, s"Error: mismatch on bin $index of $err\n\tReference: $ref\n\tChisel:    $chisel")
     }

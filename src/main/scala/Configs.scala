@@ -28,11 +28,11 @@ class DspConfig extends Config(
   (pname, site, here) => pname match {
     case BuildDSP => { (q: Parameters) => {
       implicit val p = q
-      Module(new FFTWrapper[DspReal])
+      Module(new FFTWrapper[FixedPoint])
     }}
     case FFTKey => { (q: Parameters) => { 
       implicit val p = q
-      FFTConfig[DspReal](n = 8)
+      FFTConfig[FixedPoint](n = 8)
     }}
     //NastiId => "FFT"
 	  case NastiKey => NastiParameters(64, 32, 1)
@@ -54,7 +54,8 @@ class DspConfig extends Config(
           dataBits = 64)
     case DspBlockKey => DspBlockParameters(1024, 1024)
     case GenKey => new GenParameters {
-      def getReal(): DspReal = DspReal(0.0).cloneType
+      //def getReal(): DspReal = DspReal(0.0).cloneType
+      def getReal(): FixedPoint = FixedPoint(width=32, binaryPoint=16) 
       def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
       override def genOut[T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
       val lanesIn = 8
@@ -63,7 +64,7 @@ class DspConfig extends Config(
     case _ => throw new CDEMatchError
   })
 
-case object FFTKey extends Field[(Parameters) => FFTConfig[DspReal]]
+case object FFTKey extends Field[(Parameters) => FFTConfig[FixedPoint]]
 
 trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
    def genTwiddle: Option[T] = None
@@ -72,7 +73,7 @@ trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
 case class FFTConfig[T<:Data:Real](n: Int = 8, // n-point FFT
                                    pipelineDepth: Int = 0,
                                    real: Boolean = false // real inputs?
-                                  )(implicit val p: Parameters) extends HasFFTGenParameters[DspComplex[T]] {
+                                  )(implicit val p: Parameters) extends HasGenParameters[T,T] {
   assert(lanesIn == lanesOut, "FFT must have an equal number of input and output lanes")
   assert(n >= 4, "For an n-point FFT, n must be 4 or more")
   assert(lanesIn >= 2, "Must have at least 2 parallel inputs")
@@ -131,9 +132,5 @@ case class FFTConfig[T<:Data:Real](n: Int = 8, // n-point FFT
     q = q/2
   }
   val dindices = (0 until temp.size).map(x => temp((x*2)%temp.size+x*2/temp.size)).flatten
-
-  // create rom
-  val twiddle_rom = Wire(Vec(twiddle.size, genTwiddle.getOrElse(genIn())))
-  twiddle_rom.zip(twiddle).foreach { case(rom, value) => rom := DspComplex.wire(implicitly[Real[T]].fromDouble(value(0)), implicitly[Real[T]].fromDouble(value(1))) }
 }
 
