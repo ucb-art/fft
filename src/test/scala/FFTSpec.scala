@@ -7,7 +7,8 @@ import breeze.signal.{fourierTr}
 import breeze.linalg._
 import chisel3._
 import chisel3.util._
-import chisel3.iotesters.PeekPokeTester
+import chisel3.iotesters._
+import firrtl_interpreter.InterpreterOptions
 import dsptools.numbers.{DspReal, SIntOrder, SIntRing}
 import dsptools.{DspContext, DspTester, Grow}
 import org.scalatest.{FlatSpec, Matchers}
@@ -17,9 +18,19 @@ import scala.util.Random
 import scala.math._
 import org.scalatest.Tag
 
+import cde._
+import junctions._
+import uncore.tilelink._
+import uncore.coherence._
+
+import dsptools._
+
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
-class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
+// import LocalParams._
+
+class FFTTester[T<:Data:Real](c: FFT[T], min: Int = -20, max: Int = 20) extends DspTester(c, base=10) {
+  /*
 
   // bit reverse a value
   def bit_reverse(in: Int, width: Int): Int = {
@@ -65,7 +76,6 @@ class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) 
         val subindex = output_counter*2*parallelism+index
         val bin = (bit_reverse(subindex%fft_size+subindex/fft_size*parallelism, log2Up(fft_size))) 
         val value = dspPeek(port).right.get
-        val mag = value.abs
         output(bin) = dspPeek(port).right.get 
       }}
       output_counter = output_counter + 1
@@ -79,8 +89,6 @@ class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) 
     if (chisel != ref) {
       val epsilon = 1e-12
       val err = (chisel-ref).abs/(ref.abs+epsilon)
-      val refabs = ref.abs
-      val chiselabs = chisel.abs
       errs(index) = err
       assert(err < epsilon || ref.abs < epsilon, s"Error: mismatch on bin $index of $err\n\tReference: $ref\n\tChisel:    $chisel")
     }
@@ -102,9 +110,70 @@ class FFTTester[T<:Data:Real](c: FFTUnpacked[T], min: Int = -20, max: Int = 20) 
   //  .withScatter(x, output.map(_.imag), ScatterOptions().name("Chisel"))
   //  .withScatter(x, y.map(_.imag), ScatterOptions().name("Reference"))
   //draw(q, "imag spectrum", writer.FileOptions(overwrite=true))
+  */
+}
+
+class FFTWrapperTester[T <: Data](c: FFTWrapper[T]) extends DspBlockTester(c) {
+  def doublesToBigInt(in: Seq[Double]): BigInt = {
+    in.reverse.foldLeft(BigInt(0)) {case (bi, dbl) =>
+      val new_bi = BigInt(java.lang.Double.doubleToLongBits(dbl))
+      (bi << 64) | new_bi
+    }
+  }
+  def rawStreamIn = Seq(
+    Seq(1.0) ++ Seq.fill(15){0.0},
+    Seq.fill(16){1.0},
+    Seq.fill(16){0.0}
+  )
+  def streamIn = rawStreamIn.map(doublesToBigInt)
+
+  pauseStream
+  val addrMap = testchipip.SCRAddressMap("FFTWrapper").get
+  println("Addr Map:\n")
+  println(addrMap.map(_.toString).toString)
+  println(addrMap("fftControl").toString)
+
+  axiWrite(0, 1)
+
+  println(peek(c.io.out.sync).toString)
+
+  step(10)
+  axiWrite(8, 0)
+  println(peek(c.io.out.sync).toString)
+
+  playStream
+
+  step(10)
+  println(peek(c.io.out.sync).toString)
+
+  println("Input:")
+  rawStreamIn.foreach{ x => println(x.toString) }
+
+  println("Output:")
+  streamOut.foreach { x => (0 until 16).foreach { idx => {
+    val y = (x >> (64 * idx)) & 0xFFFFFFFFFFFFFFFFL
+    print(java.lang.Double.longBitsToDouble(y.toLong).toString + " ") }}
+    println()
+  }
+}
+
+class FFTWrapperSpec extends FlatSpec with Matchers {
+  behavior of "FFTWrapper"
+  val manager = new TesterOptionsManager {
+    testerOptions = TesterOptions(backendName = "verilator", testerSeed = 7L)
+    interpreterOptions = InterpreterOptions(setVerbose = false, writeVCD = true)
+  }
+
+  it should "work with DspBlockTester" in {
+    implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
+    val dut = () => new FFTWrapper[DspReal]()
+    chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTWrapperTester(c) } should be (true)
+  }
+
 }
 
 class FFTSpec extends FlatSpec with Matchers {
+  /*
 
   // FFT
   behavior of "FFT"
@@ -114,6 +183,12 @@ class FFTSpec extends FlatSpec with Matchers {
     for (i <- 2 until 7 by 2) {
       for (j <- 1 until i+1) {
         for (k <- 0 until i+1 by 2) {
+          val firrtlString = chisel3.Driver.emit(() => new FFTUnpacked(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k)))
+          import java.io._
+          val pw = new PrintWriter(new File(s"output.fir"))
+          pw.write(firrtlString)
+          pw.close
+
           chisel3.iotesters.Driver(() => new FFTUnpacked(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = pow(2,i).toInt, p = pow(2,j).toInt, pipelineDepth=k))) {
             c => new FFTTester(c)
           } should be (true)
@@ -121,27 +196,17 @@ class FFTSpec extends FlatSpec with Matchers {
       }
     }
   }
+  */
 }
 
-object FFTVerilog extends App {
-  override def main(args: Array[String]): Unit = {
-    import firrtl._
-    def getReal(): DspReal = DspReal(0.0)
-    //def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
-    val input = chisel3.Driver.emit(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 8, p = 8)))
-    val om = new ExecutionOptionsManager("FFT") with HasFirrtlOptions
-    om.setTargetDirName("generated-src")
-    om.setTopName("FFT")
-    om.firrtlOptions = om.firrtlOptions.copy(firrtlSource = Some(input))
-    println(firrtl.Driver.execute(om))
-  }
-}
+// execute FIRRTL Repl for testing
+object DspRepl {
+  implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
 
-object FFTSpec {
   def getReal(): DspReal = new DspReal
   def main(args: Array[String]): Unit = {
     dsptools.Driver.executeFirrtlRepl(
-      () => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 8, p = 4))
+      () => new FFT[DspReal]()(p)
     )
   }
 }
