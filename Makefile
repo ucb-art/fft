@@ -24,3 +24,6 @@ $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).v: $(build_dir)/$(PROJECT).$(MODEL).$
 	$(FIRRTL) -i $< -o $@ -X verilog
 
 verilog: $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).v
+
+test: $(all_stamps)
+	$(SBT) test

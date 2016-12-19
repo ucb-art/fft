@@ -10,11 +10,13 @@ import dsptools.numbers._
 import dsptools.numbers.implicits._
 import firrtl._
 
-object FFTVerilog extends App {
+object FFTVerilog extends DspGeneratorApp {
+  val longName = "fft"
   override def main(args: Array[String]): Unit = {
+    implicit val p = getParameters(new DspConfig)
     //def getReal(): DspReal = DspReal(0.0)
     def getReal(): FixedPoint = FixedPoint(width = 16, binaryPoint = 7)
-    val input = chisel3.Driver.emit(() => new FFT(genIn = DspComplex(getReal, getReal), config = new FFTConfig(n = 8, p = 2)))
+    val input = chisel3.Driver.emit(() => new FFT[FixedPoint]())
     val om = new ExecutionOptionsManager("FFT") with HasFirrtlOptions
     om.setTargetDirName("generated-src")
     om.setTopName("FFT")

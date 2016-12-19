@@ -206,7 +206,7 @@ object DspRepl {
   def getReal(): DspReal = new DspReal
   def main(args: Array[String]): Unit = {
     dsptools.Driver.executeFirrtlRepl(
-      () => new FFT[DspReal]()(p)
+      () => new FFT[DspReal]
     )
   }
 }
