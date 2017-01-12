@@ -28,11 +28,11 @@ class DspConfig extends Config(
   (pname, site, here) => pname match {
     case BuildDSP => { (q: Parameters) => {
       implicit val p = q
-      Module(new FFTWrapper[FixedPoint])
+      Module(new FFTWrapper[DspReal])
     }}
     case FFTKey => { (q: Parameters) => { 
       implicit val p = q
-      FFTConfig[FixedPoint](n = 8)
+      FFTConfig[DspReal](n = 8)
     }}
     //NastiId => "FFT"
 	  case NastiKey => NastiParameters(64, 32, 1)
@@ -54,8 +54,7 @@ class DspConfig extends Config(
           dataBits = 64)
     case DspBlockKey => DspBlockParameters(1024, 1024)
     case GenKey => new GenParameters {
-      //def getReal(): DspReal = DspReal(0.0).cloneType
-      def getReal(): FixedPoint = FixedPoint(width=32, binaryPoint=16) 
+      def getReal(): DspReal = DspReal(0.0).cloneType
       def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
       override def genOut[T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
       val lanesIn = 8
@@ -64,7 +63,7 @@ class DspConfig extends Config(
     case _ => throw new CDEMatchError
   })
 
-case object FFTKey extends Field[(Parameters) => FFTConfig[FixedPoint]]
+case object FFTKey extends Field[(Parameters) => FFTConfig[DspReal]]
 
 trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
    def genTwiddle: Option[T] = None
