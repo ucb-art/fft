@@ -311,7 +311,8 @@ xcuserdata
 # sbt specific
 .cache
 .history
-.lib/
+/lib
+/.ivy2
 dist/*
 target/
 lib_managed/
