@@ -1,16 +1,20 @@
 package fft
 
+import util.GeneratorApp
 import org.accellera.spirit.v1685_2009.{File => SpiritFile, _}
 import javax.xml.bind.{JAXBContext, Marshaller}
 import java.io.{File, FileOutputStream}
 import scala.collection.JavaConverters
 import java.util.Collection
 import java.math.BigInteger
+import rocketchip._
+import junctions._
+import cde.Parameters
 import dsptools.junctions._
+import dsptools._
 
-object Generator extends App {
-
-  lazy val td = "generated-src"
+// includes IPXact generation
+trait DspGeneratorApp extends GeneratorApp {
 
   def toCollection[T](seq: Seq[T]): Collection[T] =
     JavaConverters.asJavaCollectionConverter(seq).asJavaCollection
@@ -77,9 +81,9 @@ object Generator extends App {
       makePort(s"${prefix}_${name}", portdir, width) }
   }
 
-  def makeAllPorts(bits: Int): ModelType.Ports = {
-    val inPorts = makeAXIPorts(s"io_in", false, bits)
-    val outPorts = makeAXIPorts(s"io_out", true, bits)
+  def makeAllPorts(bits_in: Int, bits_out: Int): ModelType.Ports = {
+    val inPorts = makeAXIPorts(s"io_in", false, bits_in)
+    val outPorts = makeAXIPorts(s"io_out", true, bits_out)
     val globalPorts = Seq(
       makePort("clock", false, 1),
       makePort("reset", false, 1))
@@ -152,7 +156,8 @@ object Generator extends App {
   }
 
   def generateIPXact {
-    val bits = 1024
+    val bits_in = params(DspBlockKey).inputWidth
+    val bits_out = params(DspBlockKey).outputWidth
     val factory = new ObjectFactory
 
     val busInterfaces = new BusInterfaces
@@ -170,11 +175,11 @@ object Generator extends App {
     fileSetRefs.add(verilogSource)
     views.getView.add(view)
     model.setViews(views)
-    model.setPorts(makeAllPorts(bits))
+    model.setPorts(makeAllPorts(bits_in, bits_out))
 
     val componentType = new ComponentType
-    componentType.setLibrary("ucb-bar")
-    componentType.setName("CraftFFT")
+    componentType.setLibrary("ucb-art")
+    componentType.setName("CraftDSPModule")
     componentType.setVendor("edu.berkeley.cs")
     componentType.setVersion("1.0")
     componentType.setBusInterfaces(busInterfaces)
@@ -191,9 +196,10 @@ object Generator extends App {
     marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true)
     marshaller.marshal(component, fos)
   }
+}
 
-  //val longName = names.topModuleProject + "." + names.configs
-  val longName = "FFT"
-  //generateFirrtl
+object Generator extends DspGeneratorApp {
+  val longName = names.fullTopModuleClass + "." + names.configs
+  generateFirrtl
   generateIPXact
 }
