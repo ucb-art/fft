@@ -37,12 +37,14 @@ case object FFTSize extends Field[Int]
 class DspConfig extends Config(
   (pname, site, here) => pname match {
     case BuildDSP => { (q: Parameters) => {
-      Module(new FFTWrapper[DspReal]()(DspRealRealImpl, q))
+      //Module(new FFTWrapper[FixedPoint]()(DspRealRealImpl, q))
+      implicit val p = q
+      Module(new FFTWrapper[FixedPoint])
     }}
     case FFTSize => 8
     case FFTKey => { (q: Parameters) => { 
       implicit val p = q
-      FFTConfig[DspReal](n = site(FFTSize))
+      FFTConfig[FixedPoint](n = site(FFTSize))
     }}
     //NastiId => "FFT"
 	  case NastiKey => NastiParameters(64, 32, 1)
@@ -64,8 +66,8 @@ class DspConfig extends Config(
           dataBits = 64)
     case DspBlockKey => DspBlockParameters(1024, 1024)
     case GenKey => new GenParameters {
-      //def getReal(): DspReal = DspReal(0.0).cloneType
-      def getReal(): FixedPoint = FixedPoint(width=32, binaryPoint=16) 
+      //def getReal(): DspReal = DspReal()//DspReal(0.0).cloneType
+      def getReal(): FixedPoint = FixedPoint(width=16, binaryPoint=8) 
       def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
       override def genOut[T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
       val lanesIn = 8
