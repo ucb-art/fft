@@ -1,10 +1,24 @@
-git:
-  submodules: true
 language: scala
-# run on new infrastructure
 sudo: false
 
+install:
+  # Install Verilator (if not found in cache)
+  # Get it from firrtl's install script
+  - wget "https://raw.githubusercontent.com/ucb-bar/firrtl/master/.install_verilator.sh"
+  - bash .install_verilator.sh
+
+cache:
+  directories:
+    $INSTALL_DIR
+
+env:
+  global:
+    INSTALL_DIR=$TRAVIS_BUILD_DIR/install
+    VERILATOR_ROOT=$INSTALL_DIR
+    PATH=$PATH:$VERILATOR_ROOT/bin:$TRAVIS_BUILD_DIR/utils/bin
+
 script:
-  - cd dsp-framework; echo "Publishing the framework, this may take a while..."; ./update.bash > /dev/null; cd ..; echo "Done updating!"
-  - make travis-test |& sed -e '/LoFirrtl/,/End of dependency graph/d'
+  - git submodule update --init
+  - cd dsp-framework; echo "Publishing the framework, this may take a while..."; ./update.bash; cd ..; make libs > /dev/null; echo "Done updating!"
+  - make travis
 

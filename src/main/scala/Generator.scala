@@ -201,22 +201,25 @@ trait DspGeneratorApp extends GeneratorApp {
     val busType = new LibraryRefType
     busType.setVendor("amba.com")
     busType.setLibrary("AMBA4")
-    busType.setName("AXI4")
-    busType.setVersion("r0p0_0")
+    busType.setName("AXI4Stream")
+    busType.setVersion("r0p0_1")
 
     val abstractionType = new LibraryRefType
     abstractionType.setVendor("amba.com")
     abstractionType.setLibrary("AMBA4")
-    abstractionType.setName("AXI4_rtl")
-    abstractionType.setVersion("r0p0_0")
+    abstractionType.setName("AXI4Stream_rtl")
+    abstractionType.setVersion("r0p0_1")
 
     val portMaps = makeAXIStreamPortMaps(s"io_in")
+
+    val slave = new BusInterfaceType.Slave
 
     val busif = new BusInterfaceType
     busif.setName(s"io_in")
     busif.setBusType(busType)
     busif.setAbstractionType(abstractionType)
     busif.setPortMaps(portMaps)
+    busif.setSlave(slave)
     busif
   }
 
@@ -224,26 +227,29 @@ trait DspGeneratorApp extends GeneratorApp {
     val busType = new LibraryRefType
     busType.setVendor("amba.com")
     busType.setLibrary("AMBA4")
-    busType.setName("AXI4")
-    busType.setVersion("r0p0_0")
+    busType.setName("AXI4Stream")
+    busType.setVersion("r0p0_1")
 
     val abstractionType = new LibraryRefType
     abstractionType.setVendor("amba.com")
     abstractionType.setLibrary("AMBA4")
-    abstractionType.setName("AXI4_rtl")
-    abstractionType.setVersion("r0p0_0")
+    abstractionType.setName("AXI4Stream_rtl")
+    abstractionType.setVersion("r0p0_1")
 
     val portMaps = makeAXIStreamPortMaps(s"io_out")
+
+    val master = new BusInterfaceType.Master
 
     val busif = new BusInterfaceType
     busif.setName(s"io_out")
     busif.setBusType(busType)
     busif.setAbstractionType(abstractionType)
     busif.setPortMaps(portMaps)
+    busif.setMaster(master)
     busif
   }
 
-  def makeAXIInterface: BusInterfaceType = {
+  def makeAXIInterface(mmref: String): BusInterfaceType = {
     val busType = new LibraryRefType
     busType.setVendor("amba.com")
     busType.setLibrary("AMBA4")
@@ -256,11 +262,11 @@ trait DspGeneratorApp extends GeneratorApp {
     abstractionType.setName("AXI4_rtl")
     abstractionType.setVersion("r0p0_0")
 
-    val addrSpaceRef = new BusInterfaceType.Master.AddressSpaceRef
-    addrSpaceRef.setAddressSpaceRef(s"s_as")
+    val mmRefType = new MemoryMapRefType
+    mmRefType.setMemoryMapRef(mmref)
 
-    val master = new BusInterfaceType.Master
-    master.setAddressSpaceRef(addrSpaceRef)
+    val slave = new BusInterfaceType.Slave
+    slave.setMemoryMapRef(mmRefType)
 
     val portMaps = makeAXIPortMaps(s"io_axi")
 
@@ -269,6 +275,7 @@ trait DspGeneratorApp extends GeneratorApp {
     busif.setBusType(busType)
     busif.setAbstractionType(abstractionType)
     busif.setPortMaps(portMaps)
+    busif.setSlave(slave)
     busif
   }
 
@@ -295,21 +302,28 @@ trait DspGeneratorApp extends GeneratorApp {
     val baseAddress = new BaseAddress
     baseAddress.setValue("0x" + baseAddr.toString(16))
     addrBlockMap.setBaseAddress(baseAddress)
-    val registers = addrBlockMap.getRegister()
     
     val scrMap = testchipip.SCRAddressMap.contents.head._2
+    val range = new BankedBlockType.Range
+    range.setValue(s"${scrMap.size}")
+    addrBlockMap.setRange(range)
+    val width = new BankedBlockType.Width
+    width.setValue(BigInteger.valueOf(64))
+    addrBlockMap.setWidth(width)
+    addrBlockMap.setUsage(UsageType.REGISTER)
+    val registers = addrBlockMap.getRegister()
     scrMap.foreach { case(scrName, scrOffset) => 
       val register = new RegisterFile.Register
       register.setName(scrName)
       register.setAddressOffset("0x" + scrOffset.toString(16))
       val size = new RegisterFile.Register.Size
-      size.setValue(new BigInteger("64"))
+      size.setValue(BigInteger.valueOf(64))
       register.setSize(size)
       registers.add(register)
     }
     addrBlocks.add(addrBlockMap)
 
-    memoryMap.setAddressUnitBits(BigInteger.valueOf(8))
+    memoryMap.setAddressUnitBits(BigInteger.valueOf(64))
     memoryMap
   }
 
@@ -349,16 +363,17 @@ trait DspGeneratorApp extends GeneratorApp {
     val bits_in = params(DspBlockKey).inputWidth
     val bits_out = params(DspBlockKey).outputWidth
     val factory = new ObjectFactory
+    val memMapName = "mm"
 
     val busInterfaces = new BusInterfaces
-    busInterfaces.getBusInterface().addAll(toCollection(Seq(makeInputInterface, makeOutputInterface, makeAXIInterface)))
+    busInterfaces.getBusInterface().addAll(toCollection(Seq(makeInputInterface, makeOutputInterface, makeAXIInterface(memMapName))))
 
     //val addressSpaces = new AddressSpaces
     //addressSpaces.getAddressSpace.addAll(toCollection(
     //  (0 until nOutputs).map(i => makeAddressSpace(s"s${i}_as", regionSize))
     //))
     val memoryMaps = new MemoryMaps
-    memoryMaps.getMemoryMap().add(makeMemoryMap("mm", BigInt(0)))
+    memoryMaps.getMemoryMap().add(makeMemoryMap(memMapName, BigInt(0)))
 
     val model = new ModelType
     val views = new ModelType.Views
