@@ -36,7 +36,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
 
   // synchronize
   val sync = CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
-  io.out.sync := ShiftRegisterMem(io.in.sync, config.direct_pipe, io.in.valid)
+  io.out.sync := ShiftRegisterWithReset(io.in.sync, config.direct_pipe, 0.U, io.in.valid)
   io.out.valid := io.in.valid
 
   // wire up twiddles
@@ -102,7 +102,7 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
   val sync = List.fill(log2Up(config.bp)+1)(Wire(UInt(width=log2Up(config.bp))))
   sync(0) := CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
-  sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegisterMem(prev, delay, io.in.valid) }
+  sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegisterWithReset(prev, delay, 0.U, io.in.valid) }
   io.out.sync := sync(log2Up(config.bp)) === UInt((config.bp/2-1+config.biplex_pipe)%config.bp)
   io.out.valid := io.in.valid
 

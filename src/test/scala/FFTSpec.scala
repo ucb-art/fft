@@ -49,7 +49,8 @@ class FFTWrapperTester[T <: Data](c: FFTWrapper[T])(implicit p: Parameters) exte
   playStream
   step(test_length)
   val output = unpackOutputStream(gk.genOut, gk.lanesOut)
-  
+
+  // print out data sets for visual confirmation
   println("Input")
   println(input.toArray.flatten.deep.mkString(","))
   println("Chisel Output")
@@ -57,8 +58,9 @@ class FFTWrapperTester[T <: Data](c: FFTWrapper[T])(implicit p: Parameters) exte
   println("Reference Output")
   println(expected_output.toArray.deep.mkString(","))
 
+  // compare results, only works for DC impulse spectra right now
   // TODO: unscramble, handle multi-cycle data sets
-  compareOutputComplex(output, expected_output)
+  compareOutputComplex(output, expected_output, 0.125)
 }
 
 class FFTWrapperSpec extends FlatSpec with Matchers {

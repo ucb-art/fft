@@ -7,6 +7,16 @@ This project contains a streaming, pipelined Fast Fourier Transform (FFT).
 
 # Usage
 
+## Inside this repo
+
+Build the dependencies by typing `make libs`.
+To test the block, type `make test`.
+This runs the block tester in the `src/test/scala` directory.
+To build the Verilog and IP-Xact output, type `make verilog`.
+Results are placed in a `generated-src` directory.
+
+## Outside this repo
+
 In your Config class, add an FFTKey which points to the FFTConfig you want.
 Set the size of the FFT (n) and the desired pipline depth in the config.
 Hook up the input and output to other DSP streaming interfaces, and connect the AXI4 control interface to an AXI4 master or crossbar.
