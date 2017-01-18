@@ -44,7 +44,7 @@ case object BuildDSP extends Field[(Parameters) => LazyDspBlock]
 
 trait DspModule {
   val p: Parameters
-  val module = LazyModule(p(BuildDSP)(p)).module
+  val module = Module(LazyModule(p(BuildDSP)(p)).module)
 }
 
 class DspBareTop(val p: Parameters) extends Module with DspModule {
