@@ -7,9 +7,26 @@ This project contains a streaming, pipelined Fast Fourier Transform (FFT).
 
 # Usage
 
-In your Config class, add an FFTKey which points to the FFTConfig you want.
-Set the size of the FFT (n) and the desired pipline depth in the config.
-Hook up the input and output to other DSP streaming interfaces, and connect the AXI4 control interface to an AXI4 master or crossbar.
+## Building
+
+Build the dependencies by typing `make libs`.
+To build the Verilog and IP-Xact output, type `make verilog`.
+Results are placed in a `generated-src` directory.
+
+## Testing
+
+To test the block, type `make test`.
+This runs the block tester in the `src/test/scala` directory.
+It currently just tests the DC bin until unscrambling and futher testing capabilities are added.
+
+## Configuring
+
+In `src/main/scala` there is a `Config.scala` file.
+In the `DspConfig` class are a bunch of parameters, like `FFTSize` and `FractionalBits`.
+Set these to your desired values, then rebuild and retest the design.
+
+TODO: changing between FixedPoint and DspReal
+
 
 # Specifications
 
@@ -17,6 +34,32 @@ Hook up the input and output to other DSP streaming interfaces, and connect the 
 
 The FFT uses the DSP streaming interface (a subset of AXI4-Stream) on both the data input and data output.
 There are nominally no status or control registers, but the SCR File requires at least one, so a status register mirrors the sync output.
+
+## Signaling
+
+### Bits
+
+It is expected that the bits inputs contain time-series data time-multiplexed on the inputs, such that on the first cycle are values x[0], x[1], …, x[p-1], then the next cycle contains x[p], x[p+1], … and this continues until the input is x[n-p], x[n-p+1], …, x[n-1]. 
+The outputs are scrambled spectral bins. 
+Since there is some unscrambling between the biplex and direct form FFT, the output indices are not purely bit reversed. 
+The 0th output on each cycle increments by one every cycle, while the other outputs are bit reversed values of the 0th value plus the output number. 
+For example, if n = 16 and p = 4, the outputs are time-multiplexed across n/p = 4 cycles. 
+Thus the outputs are X[0], X[8], X[4], X[12] on cycle 0, X[1], X[9], X[5], X[13] on cycle 1, X[2], X[10], X[6], X[14] on cycle 2, and X[3], X[11], X[7], X[15] on cycle 3.
+
+### Valid
+
+The FFT does not keep track of which bits are valid after coming out of reset, so valid simply passes through the FFT on the same cycle. 
+When valid goes low, all registers in the design are paused.
+
+### Sync
+
+Like valid, the FFT does not keep track of the initial state of synchronization coming out of reset, so the sync signal is passed through the FFT after being pipelined appropriately. 
+Thus the first few sync signals at the output coming out of reset maybe be incorrect. 
+But the first input sync signal will set flush through, synchronizing all the FFT butterflies with the first dataset. 
+The input sync is expected to be periodic in the size of the FFT (n) divided by the number of input lanes (p). 
+Sync should be high on the last cycle of the spectrum. 
+The new spectrum starts on the next valid cycle. 
+When n=p, sync should always be high when valid is high.
 
 ## Implementation
 

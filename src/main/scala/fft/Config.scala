@@ -15,6 +15,8 @@ import dsptools.numbers.{DspComplex, Real}
 import scala.util.Random
 import scala.math._
 import org.scalatest.Tag
+import dspjunctions._
+import dspblocks._
 
 import cde._
 import junctions._
@@ -32,16 +34,19 @@ trait HasIPXACTParameters {
 }
 
 case object FFTSize extends Field[Int]
+case object TotalWidth extends Field[Int]
+case object FractionalBits extends Field[Int]
 
 // create a new DSP Configuration
 class DspConfig extends Config(
   (pname, site, here) => pname match {
-    case BuildDSP => { (q: Parameters) => {
-      //Module(new FFTWrapper[FixedPoint]()(DspRealRealImpl, q))
+    case BuildDSP => q: Parameters =>
       implicit val p = q
-      Module(new FFTWrapper[FixedPoint])
-    }}
+      new LazyFFTBlock[FixedPoint]
     case FFTSize => 8
+    case TotalWidth => 16
+    case BaseAddr => 0
+    case FractionalBits => 8
     case FFTKey => { (q: Parameters) => { 
       implicit val p = q
       FFTConfig[FixedPoint](n = site(FFTSize))
@@ -67,7 +72,7 @@ class DspConfig extends Config(
     case DspBlockKey => DspBlockParameters(1024, 1024)
     case GenKey => new GenParameters {
       //def getReal(): DspReal = DspReal()//DspReal(0.0).cloneType
-      def getReal(): FixedPoint = FixedPoint(width=16, binaryPoint=8) 
+      def getReal(): FixedPoint = FixedPoint(width=site(TotalWidth), binaryPoint=site(FractionalBits)) 
       def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
       override def genOut[T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
       val lanesIn = 8
@@ -75,36 +80,50 @@ class DspConfig extends Config(
     }
     case _ => throw new CDEMatchError
   }) with HasIPXACTParameters {
+
   def getIPXACTParameters: Map[String, String] = {
-    // Get unadulterated, top level parameters.
-    val parameterList = List[Field[_]](TLId, PAddrBits)
-    val parameterMap = parameterList.foldLeft(Map[String, String]()) { (m, s) => m(s.toString) = params(s).toString; m }
+    //// Get unadulterated, top level parameters.
+    //val parameterList = List[Field[_]](TLId, PAddrBits)
+    //val parameterMap = parameterList.foldLeft(Map[String, String]()) { (m, s) => m(s.toString) = params(s).toString; m }
 
-    // Get some nested parameters.
-    val (nastiDataBits, nastiAddrBits, nastiIdBits) = params(NastiKey) match {
-      case NastiParameters(d: Int, a: Int, i: Int) => (d, a, i)
-    }
-    parameterMap ++= List(("nastiDataBits", nastiDataBits.toString))
+    //// Get some nested parameters.
+    //val (nastiDataBits, nastiAddrBits, nastiIdBits) = params(NastiKey) match {
+    //  case NastiParameters(d: Int, a: Int, i: Int) => (d, a, i)
+    //}
+    //parameterMap ++= List(("nastiDataBits", nastiDataBits.toString))
 
-    // Get some nested parameters, one level deeper.
-    val (nManagers, dataBits) = params(TLKey(params(TLId))) match {
-      case TileLinkParameters(    coherencePolicy: CoherencePolicy,
-      nManagers: Int,
-      nCachingClients: Int,
-      nCachelessClients: Int,
-      maxClientXacts: Int,
-      maxClientsPerPort: Int,
-      maxManagerXacts: Int,
-      dataBits: Int,
-      dataBeats: Int,
-      overrideDataBitsPerBeat: Option[Int]
-    ) => (nManagers.toString, dataBits)
-    }
-    parameterMap ++= List(("nManagers", nManagers.toString), ("dataBits", dataBits.toString))
+    //// Get some nested parameters, one level deeper.
+    //val (nManagers, dataBits) = params(TLKey(params(TLId))) match {
+    //  case TileLinkParameters(    coherencePolicy: CoherencePolicy,
+    //  nManagers: Int,
+    //  nCachingClients: Int,
+    //  nCachelessClients: Int,
+    //  maxClientXacts: Int,
+    //  maxClientsPerPort: Int,
+    //  maxManagerXacts: Int,
+    //  dataBits: Int,
+    //  dataBeats: Int,
+    //  overrideDataBitsPerBeat: Option[Int]
+    //) => (nManagers.toString, dataBits)
+    //}
+    //parameterMap ++= List(("nManagers", nManagers.toString), ("dataBits", dataBits.toString))
+
+    val parameterMap = Map[String, String]()
 
     // Conjure up some IPXACT synthsized parameters.
-    val fftSize = params(FFTSize)
-    parameterMap ++= List(("IsComplex", "0"), ("IsSigned", "1"), ("FFTSize", fftSize.toString))
+    val fftsize = params(FFTSize)
+    val gk = params(GenKey)
+    parameterMap ++= List(("nBands", (fftsize/gk.lanesIn).toString), ("InputLanes", gk.lanesIn.toString),
+      ("InputTotalBits", params(TotalWidth).toString), ("OutputLanes", gk.lanesOut.toString), ("OutputTotalBits", params(TotalWidth).toString),
+      ("OutputPartialBitReversed", "1"))
+
+    // add fractional bits if it's fixed point
+    // TODO: check if it's fixed point or not
+    parameterMap ++= List(("InputFractionalBits", params(FractionalBits).toString), 
+      ("OutputFractionalBits", params(FractionalBits).toString))
+
+    // tech stuff, TODO
+    parameterMap ++= List(("ClockRate", "100"), ("Technology", "TSMC16nm"))
 
     parameterMap
   }
@@ -116,8 +135,8 @@ trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
    def genTwiddle: Option[T] = None
 }
 
-case class FFTConfig[T<:Data:Real](n: Int = 8, // n-point FFT
-                                   pipelineDepth: Int = 0,
+case class FFTConfig[T<:Data:Real](val n: Int = 8, // n-point FFT
+                                   val pipelineDepth: Int = 0,
                                    real: Boolean = false // real inputs?
                                   )(implicit val p: Parameters) extends HasGenParameters[T,T] {
   assert(lanesIn == lanesOut, "FFT must have an equal number of input and output lanes")

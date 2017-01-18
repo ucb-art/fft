@@ -2,6 +2,7 @@
 
 package fft
 
+import diplomacy.{LazyModule, LazyModuleImp}
 import breeze.math.{Complex}
 import breeze.signal.{fourierTr}
 import breeze.linalg._
@@ -17,6 +18,8 @@ import dsptools.numbers.{DspComplex, Real}
 import scala.util.Random
 import scala.math._
 import org.scalatest.Tag
+import dspjunctions._
+import dspblocks._
 
 import cde._
 import junctions._
@@ -27,7 +30,7 @@ import dsptools._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
-class FFTWrapperTester[T <: Data](c: FFTWrapper[T])(implicit p: Parameters) extends DspBlockTester(c)(p) {
+class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBlockTester(c)(p) {
 
   // grab some parameters and configuration stuff
   val config = p(FFTKey)(p)
@@ -49,7 +52,8 @@ class FFTWrapperTester[T <: Data](c: FFTWrapper[T])(implicit p: Parameters) exte
   playStream
   step(test_length)
   val output = unpackOutputStream(gk.genOut, gk.lanesOut)
-  
+
+  // print out data sets for visual confirmation
   println("Input")
   println(input.toArray.flatten.deep.mkString(","))
   println("Chisel Output")
@@ -57,12 +61,13 @@ class FFTWrapperTester[T <: Data](c: FFTWrapper[T])(implicit p: Parameters) exte
   println("Reference Output")
   println(expected_output.toArray.deep.mkString(","))
 
+  // compare results, only works for DC impulse spectra right now
   // TODO: unscramble, handle multi-cycle data sets
-  compareOutputComplex(output, expected_output)
+  compareOutputComplex(output, expected_output, 0.125)
 }
 
-class FFTWrapperSpec extends FlatSpec with Matchers {
-  behavior of "FFTWrapper"
+class FFTSpec extends FlatSpec with Matchers {
+  behavior of "FFT"
   val manager = new TesterOptionsManager {
     testerOptions = TesterOptions(backendName = "firrtl", testerSeed = 7L)
     interpreterOptions = InterpreterOptions(setVerbose = false, writeVCD = true)
@@ -70,8 +75,8 @@ class FFTWrapperSpec extends FlatSpec with Matchers {
 
   it should "work with DspBlockTester" in {
     implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
-    val dut = () => new FFTWrapper[FixedPoint]()
-    chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTWrapperTester(c) } should be (true)
+    val dut = () => LazyModule(new LazyFFTBlock[FixedPoint]).module
+    chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTTester(c) } should be (true)
   }
 
 }
