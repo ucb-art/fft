@@ -16,6 +16,7 @@ import scala.util.Random
 import scala.math._
 import org.scalatest.Tag
 import dspjunctions._
+import dspblocks._
 
 import cde._
 import junctions._

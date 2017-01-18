@@ -11,6 +11,7 @@ import rocketchip._
 import junctions._
 import cde.Parameters
 import dspjunctions._
+import dspblocks._
 import dsptools._
 
 class NastiConfig(implicit val p: Parameters) extends HasNastiParameters {}

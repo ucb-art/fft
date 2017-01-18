@@ -11,6 +11,7 @@ import dsptools._
 import dsptools.numbers.{DspComplex, Real, DspReal}
 import dsptools.numbers.implicits._
 import dspjunctions._
+import dspblocks._
 import dsptools.counters._
 import scala.math._
 import rocketchip.PeripheryUtils

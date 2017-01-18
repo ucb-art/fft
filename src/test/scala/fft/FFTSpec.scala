@@ -2,6 +2,7 @@
 
 package fft
 
+import diplomacy.{LazyModule, LazyModuleImp}
 import breeze.math.{Complex}
 import breeze.signal.{fourierTr}
 import breeze.linalg._
@@ -18,6 +19,7 @@ import scala.util.Random
 import scala.math._
 import org.scalatest.Tag
 import dspjunctions._
+import dspblocks._
 
 import cde._
 import junctions._
@@ -28,7 +30,7 @@ import dsptools._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
-class FFTTester[T <: Data](c: LazyFFTBlock[T])(implicit p: Parameters) extends DspBlockTester(c)(p) {
+class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBlockTester(c)(p) {
 
   // grab some parameters and configuration stuff
   val config = p(FFTKey)(p)
@@ -73,7 +75,7 @@ class FFTSpec extends FlatSpec with Matchers {
 
   it should "work with DspBlockTester" in {
     implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
-    val dut = () => new LazyFFTBlock[FixedPoint]()
+    val dut = () => LazyModule(new LazyFFTBlock[FixedPoint]).module
     chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTTester(c) } should be (true)
   }
 

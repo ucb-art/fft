@@ -13,6 +13,7 @@ import firrtl_interpreter.InterpreterOptions
 import dsptools.numbers.{DspReal, SIntOrder, SIntRing}
 import dsptools.{DspContext, DspTester, Grow}
 import dspjunctions._
+import dspblocks._
 import org.scalatest.{FlatSpec, Matchers}
 import dsptools.numbers.implicits._
 import dsptools.numbers.{DspComplex, Real}
