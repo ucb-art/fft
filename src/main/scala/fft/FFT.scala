@@ -10,7 +10,7 @@ import chisel3.core.ExplicitCompileOptions
 import dsptools._
 import dsptools.numbers.{DspComplex, Real, DspReal}
 import dsptools.numbers.implicits._
-import dsptools.junctions._
+import dspjunctions._
 import dsptools.counters._
 import scala.math._
 import rocketchip.PeripheryUtils
@@ -168,18 +168,4 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   } else {
     direct.io.in <> io.in
   }
-}
-
-class FFTWrapper[T<:Data:Real]()(implicit p: Parameters) extends GenDspBlock[DspComplex[T], DspComplex[T]]()(p) {
-  val baseAddr = BigInt(0)
-  val fft = Module(new FFT[T])
-
-  //addControl("fftControl", 0.U)
-  addStatus("fftStatus")
-
-  fft.io.in <> unpackInput(lanesIn, genIn())
-  //fft.io.in.sync := control("fftControl")(0)
-
-  unpackOutput(lanesOut, genOut()) <> fft.io.out
-  status("fftStatus") := fft.io.out.sync
 }

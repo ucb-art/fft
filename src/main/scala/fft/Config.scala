@@ -15,6 +15,7 @@ import dsptools.numbers.{DspComplex, Real}
 import scala.util.Random
 import scala.math._
 import org.scalatest.Tag
+import dspjunctions._
 
 import cde._
 import junctions._
@@ -38,13 +39,12 @@ case object FractionalBits extends Field[Int]
 // create a new DSP Configuration
 class DspConfig extends Config(
   (pname, site, here) => pname match {
-    case BuildDSP => { (q: Parameters) => {
-      //Module(new FFTWrapper[FixedPoint]()(DspRealRealImpl, q))
+    case BuildDSP => q: Parameters =>
       implicit val p = q
-      Module(new FFTWrapper[FixedPoint])
-    }}
+      new LazyFFTBlock[FixedPoint]
     case FFTSize => 8
     case TotalWidth => 16
+    case BaseAddr => 0
     case FractionalBits => 8
     case FFTKey => { (q: Parameters) => { 
       implicit val p = q

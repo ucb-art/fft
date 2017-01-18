@@ -17,6 +17,7 @@ import dsptools.numbers.{DspComplex, Real}
 import scala.util.Random
 import scala.math._
 import org.scalatest.Tag
+import dspjunctions._
 
 import cde._
 import junctions._
@@ -27,7 +28,7 @@ import dsptools._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
-class FFTWrapperTester[T <: Data](c: FFTWrapper[T])(implicit p: Parameters) extends DspBlockTester(c)(p) {
+class FFTTester[T <: Data](c: LazyFFTBlock[T])(implicit p: Parameters) extends DspBlockTester(c)(p) {
 
   // grab some parameters and configuration stuff
   val config = p(FFTKey)(p)
@@ -63,8 +64,8 @@ class FFTWrapperTester[T <: Data](c: FFTWrapper[T])(implicit p: Parameters) exte
   compareOutputComplex(output, expected_output, 0.125)
 }
 
-class FFTWrapperSpec extends FlatSpec with Matchers {
-  behavior of "FFTWrapper"
+class FFTSpec extends FlatSpec with Matchers {
+  behavior of "FFT"
   val manager = new TesterOptionsManager {
     testerOptions = TesterOptions(backendName = "firrtl", testerSeed = 7L)
     interpreterOptions = InterpreterOptions(setVerbose = false, writeVCD = true)
@@ -72,8 +73,8 @@ class FFTWrapperSpec extends FlatSpec with Matchers {
 
   it should "work with DspBlockTester" in {
     implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
-    val dut = () => new FFTWrapper[FixedPoint]()
-    chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTWrapperTester(c) } should be (true)
+    val dut = () => new LazyFFTBlock[FixedPoint]()
+    chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTTester(c) } should be (true)
   }
 
 }

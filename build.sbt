@@ -43,6 +43,6 @@ testOptions in TravisTest += Tests.Argument(TestFrameworks.ScalaTest, "-l", "edu
 
 ghpages.settings
 
-git.remoteRepo := "git@github.com:ucb-art/pfb.git"
+git.remoteRepo := "git@github.com:ucb-art/fft.git"
 
 site.includeScaladoc()
