@@ -44,9 +44,9 @@ class DspConfig extends Config(
       implicit val p = q
       new LazyFFTBlock[FixedPoint]
     case FFTSize => 8
-    case TotalWidth => 16
+    case TotalWidth => 30
     case BaseAddr => 0
-    case FractionalBits => 8
+    case FractionalBits => 24
     case FFTKey => { (q: Parameters) => { 
       implicit val p = q
       FFTConfig[FixedPoint](n = site(FFTSize))
