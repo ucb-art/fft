@@ -20,5 +20,6 @@ env:
 script:
   - git submodule update --init
   - cd dsp-framework; echo "Publishing the framework, this may take a while..."; ./update.bash; cd ..; make libs; echo "Done updating!"
+  - make verilog
   - make travis
 

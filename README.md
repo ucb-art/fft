@@ -9,7 +9,7 @@ This project contains a streaming, pipelined Fast Fourier Transform (FFT).
 
 ## GitHub Pages
 
-See ![here](https://ucb-art.github.io/fft/latest/api/) for the GitHub pages scaladoc.
+See [here](https://ucb-art.github.io/fft/latest/api/) for the GitHub pages scaladoc.
 
 ## Building
 
