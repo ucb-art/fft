@@ -1,0 +1,573 @@
+<!DOCTYPE html >
+<html>
+        <head>
+          <title>fft - fft</title>
+          <meta name="description" content="fft - fft" />
+          <meta name="keywords" content="fft fft" />
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link href="../lib/template.css" media="screen" type="text/css" rel="stylesheet" />
+      <link href="../lib/diagrams.css" media="screen" type="text/css" rel="stylesheet" id="diagrams-css" />
+      <script type="text/javascript" src="../lib/jquery.js" id="jquery-js"></script>
+      <script type="text/javascript" src="../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../lib/template.js"></script>
+      <script type="text/javascript" src="../lib/tools.tooltip.js"></script>
+      
+      <script type="text/javascript">
+         if(top === self) {
+            var url = '../index.html';
+            var hash = 'fft.package';
+            var anchor = window.location.hash;
+            var anchor_opt = '';
+            if (anchor.length >= 1)
+              anchor_opt = '@' + anchor.substring(1);
+            window.location.href = url + '#' + hash + anchor_opt;
+         }
+   	  </script>
+    
+        </head>
+        <body class="value">
+      <div id="definition">
+        <img alt="Package" src="../lib/package_big.png" />
+        
+        <h1>fft</h1><span class="permalink">
+      <a href="../index.html#fft.package" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      </div>
+
+      <h4 id="signature" class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">package</span>
+      </span>
+      <span class="symbol">
+        <span class="name">fft</span>
+      </span>
+      </h4>
+      
+          <div id="comment" class="fullcommenttop"></div>
+        
+
+      <div id="mbrsel">
+        <div id="textfilter"><span class="pre"></span><span class="input"><input id="mbrsel-input" type="text" accesskey="/" /></span><span class="post"></span></div>
+        
+        
+        <div id="visbl">
+            <span class="filtertype">Visibility</span>
+            <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+          </div>
+      </div>
+
+      <div id="template">
+        <div id="allMembers">
+        
+
+        <div id="types" class="types members">
+              <h3>Type Members</h3>
+              <ol><li name="fft.BiplexFFT" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="BiplexFFT[T&lt;:chisel3.Data]extendschisel3.ModulewithHasFFTGenParameters[dsptools.numbers.DspComplex[T]]"></a>
+      <a id="BiplexFFT[T&lt;:Data]:BiplexFFT[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="BiplexFFT.html"><span class="name">BiplexFFT</span></a><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="chisel3.Data">Data</span></span>]</span><span class="result"> extends <span class="extype" name="chisel3.Module">Module</span> with <a href="HasFFTGenParameters.html" class="extype" name="fft.HasFFTGenParameters">HasFFTGenParameters</a>[<span class="extype" name="dsptools.numbers.DspComplex">DspComplex</span>[<span class="extype" name="fft.BiplexFFT.T">T</span>]]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@BiplexFFT[T&lt;:chisel3.Data]extendschisel3.ModulewithHasFFTGenParameters[dsptools.numbers.DspComplex[T]]" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">fast fourier transform - cooley-tukey algorithm, decimation-in-time
+biplex pipelined version
+note, this is always a bp-point FFT</p>
+    </li><li name="fft.DirectFFT" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="DirectFFT[T&lt;:chisel3.Data]extendschisel3.ModulewithHasFFTGenParameters[dsptools.numbers.DspComplex[T]]"></a>
+      <a id="DirectFFT[T&lt;:Data]:DirectFFT[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="DirectFFT.html"><span class="name">DirectFFT</span></a><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="chisel3.Data">Data</span></span>]</span><span class="result"> extends <span class="extype" name="chisel3.Module">Module</span> with <a href="HasFFTGenParameters.html" class="extype" name="fft.HasFFTGenParameters">HasFFTGenParameters</a>[<span class="extype" name="dsptools.numbers.DspComplex">DspComplex</span>[<span class="extype" name="fft.DirectFFT.T">T</span>]]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@DirectFFT[T&lt;:chisel3.Data]extendschisel3.ModulewithHasFFTGenParameters[dsptools.numbers.DspComplex[T]]" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">fast fourier transform - cooley-tukey algorithm, decimation-in-time
+direct form version
+note, this is always a p-point FFT, though the twiddle factors will be different if p &lt; n</p>
+    </li><li name="fft.DspBareTop" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="DspBareTopextendschisel3.ModulewithDspModule"></a>
+      <a id="DspBareTop:DspBareTop"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="DspBareTop.html"><span class="name">DspBareTop</span></a><span class="result"> extends <span class="extype" name="chisel3.Module">Module</span> with <a href="DspModule.html" class="extype" name="fft.DspModule">DspModule</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@DspBareTopextendschisel3.ModulewithDspModule" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.DspConfig" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="DspConfigextendsConfigwithHasIPXACTParameters"></a>
+      <a id="DspConfig:DspConfig"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="DspConfig.html"><span class="name">DspConfig</span></a><span class="result"> extends <span class="extype" name="cde.Config">Config</span> with <a href="HasIPXACTParameters.html" class="extype" name="fft.HasIPXACTParameters">HasIPXACTParameters</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@DspConfigextendsConfigwithHasIPXACTParameters" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.DspGeneratorApp" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="DspGeneratorAppextendsGeneratorApp"></a>
+      <a id="DspGeneratorApp:DspGeneratorApp"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="DspGeneratorApp.html"><span class="name">DspGeneratorApp</span></a><span class="result"> extends <span class="extype" name="util.GeneratorApp">GeneratorApp</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@DspGeneratorAppextendsGeneratorApp" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.DspModule" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="DspModuleextendsAnyRef"></a>
+      <a id="DspModule:DspModule"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="DspModule.html"><span class="name">DspModule</span></a><span class="result"> extends <span class="extype" name="scala.AnyRef">AnyRef</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@DspModuleextendsAnyRef" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.DspTop" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="DspTopextendsLazyModule"></a>
+      <a id="DspTop:DspTop"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="DspTop.html"><span class="name">DspTop</span></a><span class="result"> extends <span class="extype" name="diplomacy.LazyModule">LazyModule</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@DspTopextendsLazyModule" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.DspTopBundle" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="DspTopBundleextendsBasicDspBlockIO"></a>
+      <a id="DspTopBundle:DspTopBundle"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="DspTopBundle.html"><span class="name">DspTopBundle</span></a><span class="result"> extends <span class="extype" name="dspblocks.BasicDspBlockIO">BasicDspBlockIO</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@DspTopBundleextendsBasicDspBlockIO" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.DspTopModule" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="DspTopModule[+L&lt;:fft.DspTop,+B&lt;:fft.DspTopBundle]extendsLazyModuleImpwithDspModule"></a>
+      <a id="DspTopModule[+L&lt;:DspTop,+B&lt;:DspTopBundle]:DspTopModule[L,B]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="DspTopModule.html"><span class="name">DspTopModule</span></a><span class="tparams">[<span name="L">+L &lt;: <a href="DspTop.html" class="extype" name="fft.DspTop">DspTop</a></span>, <span name="B">+B &lt;: <a href="DspTopBundle.html" class="extype" name="fft.DspTopBundle">DspTopBundle</a></span>]</span><span class="result"> extends <span class="extype" name="diplomacy.LazyModuleImp">LazyModuleImp</span> with <a href="DspModule.html" class="extype" name="fft.DspModule">DspModule</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@DspTopModule[+L&lt;:fft.DspTop,+B&lt;:fft.DspTopBundle]extendsLazyModuleImpwithDspModule" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.FFT" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="FFT[T&lt;:chisel3.Data]extendschisel3.ModulewithHasGenParameters[dsptools.numbers.DspComplex[T],dsptools.numbers.DspComplex[T]]"></a>
+      <a id="FFT[T&lt;:Data]:FFT[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="FFT.html"><span class="name">FFT</span></a><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="chisel3.Data">Data</span></span>]</span><span class="result"> extends <span class="extype" name="chisel3.Module">Module</span> with <span class="extype" name="dspblocks.HasGenParameters">HasGenParameters</span>[<span class="extype" name="dsptools.numbers.DspComplex">DspComplex</span>[<span class="extype" name="fft.FFT.T">T</span>], <span class="extype" name="dsptools.numbers.DspComplex">DspComplex</span>[<span class="extype" name="fft.FFT.T">T</span>]]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@FFT[T&lt;:chisel3.Data]extendschisel3.ModulewithHasGenParameters[dsptools.numbers.DspComplex[T],dsptools.numbers.DspComplex[T]]" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">fast fourier transform - cooley-tukey algorithm, decimation-in-time
+mixed version
+note, this is always an n-point FFT</p>
+    </li><li name="fft.FFTBlock" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="FFTBlock[T&lt;:chisel3.Data]extendsGenDspBlock[T,T]"></a>
+      <a id="FFTBlock[T&lt;:Data]:FFTBlock[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="FFTBlock.html"><span class="name">FFTBlock</span></a><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="chisel3.Data">Data</span></span>]</span><span class="result"> extends <span class="extype" name="dspblocks.GenDspBlock">GenDspBlock</span>[<span class="extype" name="fft.FFTBlock.T">T</span>, <span class="extype" name="fft.FFTBlock.T">T</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@FFTBlock[T&lt;:chisel3.Data]extendsGenDspBlock[T,T]" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.FFTConfig" visbl="pub" data-isabs="false" fullComment="yes" group="Ungrouped">
+      <a id="FFTConfig[T&lt;:chisel3.Data]extendsHasGenParameters[T,T]withProductwithSerializable"></a>
+      <a id="FFTConfig[T&lt;:Data]:FFTConfig[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">case class</span>
+      </span>
+      <span class="symbol">
+        <a href="FFTConfig.html"><span class="name">FFTConfig</span></a><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="chisel3.Data">Data</span></span>]</span><span class="params">(<span name="n">n: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">8</span></span>, <span name="pipelineDepth">pipelineDepth: <span class="extype" name="scala.Int">Int</span> = <span class="symbol">0</span></span>, <span name="real">real: <span class="extype" name="scala.Boolean">Boolean</span> = <span class="symbol">false</span></span>)</span><span class="params">(<span class="implicit">implicit </span><span name="evidence$1">evidence$1: <span class="extype" name="dsptools.numbers.Real">Real</span>[<span class="extype" name="fft.FFTConfig.T">T</span>]</span>, <span name="p">p: <span class="extype" name="cde.Parameters">Parameters</span></span>)</span><span class="result"> extends <span class="extype" name="dspblocks.HasGenParameters">HasGenParameters</span>[<span class="extype" name="fft.FFTConfig.T">T</span>, <span class="extype" name="fft.FFTConfig.T">T</span>] with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@FFTConfig[T&lt;:chisel3.Data]extendsHasGenParameters[T,T]withProductwithSerializable" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">Case class for holding FFT configuration information
+Also calculates lots of useful intermediate values for FFTs in general, such as
+pipeline register locations and twiddle factors</p><div class="fullcomment"><div class="comment cmt"><p>Case class for holding FFT configuration information
+Also calculates lots of useful intermediate values for FFTs in general, such as
+pipeline register locations and twiddle factors</p></div><dl class="paramcmts block"><dt class="param">n</dt><dd class="cmt"><p>Total size of the FFT</p></dd><dt class="param">pipelineDepth</dt><dd class="cmt"><p>Number of pipeline registers inserted (locations automatically chosen)</p></dd><dt class="param">real</dt><dd class="cmt"><p>Not currently used</p></dd></dl></div>
+    </li><li name="fft.FFTIO" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="FFTIO[T&lt;:chisel3.Data]extendschisel3.BundlewithHasGenParameters[dsptools.numbers.DspComplex[T],dsptools.numbers.DspComplex[T]]"></a>
+      <a id="FFTIO[T&lt;:Data]:FFTIO[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="FFTIO.html"><span class="name">FFTIO</span></a><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="chisel3.Data">Data</span></span>]</span><span class="result"> extends <span class="extype" name="chisel3.Bundle">Bundle</span> with <span class="extype" name="dspblocks.HasGenParameters">HasGenParameters</span>[<span class="extype" name="dsptools.numbers.DspComplex">DspComplex</span>[<span class="extype" name="fft.FFTIO.T">T</span>], <span class="extype" name="dsptools.numbers.DspComplex">DspComplex</span>[<span class="extype" name="fft.FFTIO.T">T</span>]]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@FFTIO[T&lt;:chisel3.Data]extendschisel3.BundlewithHasGenParameters[dsptools.numbers.DspComplex[T],dsptools.numbers.DspComplex[T]]" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      <p class="shortcomment cmt">IO Bundle for FFT</p>
+    </li><li name="fft.HasFFTGenParameters" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="HasFFTGenParameters[T&lt;:chisel3.Data]extendsHasGenParameters[T,T]"></a>
+      <a id="HasFFTGenParameters[T&lt;:Data]:HasFFTGenParameters[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="HasFFTGenParameters.html"><span class="name">HasFFTGenParameters</span></a><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="chisel3.Data">Data</span></span>]</span><span class="result"> extends <span class="extype" name="dspblocks.HasGenParameters">HasGenParameters</span>[<span class="extype" name="fft.HasFFTGenParameters.T">T</span>, <span class="extype" name="fft.HasFFTGenParameters.T">T</span>]</span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@HasFFTGenParameters[T&lt;:chisel3.Data]extendsHasGenParameters[T,T]" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.HasIPXACTParameters" visbl="pub" data-isabs="true" fullComment="no" group="Ungrouped">
+      <a id="HasIPXACTParametersextendsAnyRef"></a>
+      <a id="HasIPXACTParameters:HasIPXACTParameters"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">trait</span>
+      </span>
+      <span class="symbol">
+        <a href="HasIPXACTParameters.html"><span class="name">HasIPXACTParameters</span></a><span class="result"> extends <span class="extype" name="scala.AnyRef">AnyRef</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@HasIPXACTParametersextendsAnyRef" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.LazyFFTBlock" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="LazyFFTBlock[T&lt;:chisel3.Data]extendsLazyDspBlock"></a>
+      <a id="LazyFFTBlock[T&lt;:Data]:LazyFFTBlock[T]"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="LazyFFTBlock.html"><span class="name">LazyFFTBlock</span></a><span class="tparams">[<span name="T">T &lt;: <span class="extype" name="chisel3.Data">Data</span></span>]</span><span class="result"> extends <span class="extype" name="dspblocks.LazyDspBlock">LazyDspBlock</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@LazyFFTBlock[T&lt;:chisel3.Data]extendsLazyDspBlock" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.NastiConfig" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="NastiConfigextendsHasNastiParameters"></a>
+      <a id="NastiConfig:NastiConfig"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="NastiConfig.html"><span class="name">NastiConfig</span></a><span class="result"> extends <span class="extype" name="junctions.HasNastiParameters">HasNastiParameters</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@NastiConfigextendsHasNastiParameters" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.TestHarness" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="TestHarnessextendschisel3.Module"></a>
+      <a id="TestHarness:TestHarness"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">class</span>
+      </span>
+      <span class="symbol">
+        <a href="TestHarness.html"><span class="name">TestHarness</span></a><span class="result"> extends <span class="extype" name="chisel3.Module">Module</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@TestHarnessextendschisel3.Module" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li></ol>
+            </div>
+
+        
+
+        <div id="values" class="values members">
+              <h3>Value Members</h3>
+              <ol><li name="fft.BarrelShifter" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="BarrelShifter"></a>
+      <a id="BarrelShifter:BarrelShifter"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="BarrelShifter$.html"><span class="name">BarrelShifter</span></a>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@BarrelShifter" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.BuildDSP" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="BuildDSP"></a>
+      <a id="BuildDSP:BuildDSP"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="BuildDSP$.html"><span class="name">BuildDSP</span></a><span class="result"> extends <span class="extype" name="cde.Field">Field</span>[(<span class="extype" name="cde.Parameters">Parameters</span>) ⇒ <span class="extype" name="dspblocks.LazyDspBlock">LazyDspBlock</span>] with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@BuildDSP" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.Butterfly" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="Butterfly"></a>
+      <a id="Butterfly:Butterfly"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="Butterfly$.html"><span class="name">Butterfly</span></a>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@Butterfly" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.FFTKey" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="FFTKey"></a>
+      <a id="FFTKey:FFTKey"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="FFTKey$.html"><span class="name">FFTKey</span></a><span class="result"> extends <span class="extype" name="cde.Field">Field</span>[(<span class="extype" name="cde.Parameters">Parameters</span>) ⇒ <a href="FFTConfig.html" class="extype" name="fft.FFTConfig">FFTConfig</a>[<span class="extype" name="chisel3.FixedPoint">FixedPoint</span>]] with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@FFTKey" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.FFTSize" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="FFTSize"></a>
+      <a id="FFTSize:FFTSize"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="FFTSize$.html"><span class="name">FFTSize</span></a><span class="result"> extends <span class="extype" name="cde.Field">Field</span>[<span class="extype" name="scala.Int">Int</span>] with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@FFTSize" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.FractionalBits" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="FractionalBits"></a>
+      <a id="FractionalBits:FractionalBits"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="FractionalBits$.html"><span class="name">FractionalBits</span></a><span class="result"> extends <span class="extype" name="cde.Field">Field</span>[<span class="extype" name="scala.Int">Int</span>] with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@FractionalBits" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.Generator" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="Generator"></a>
+      <a id="Generator:Generator"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="Generator$.html"><span class="name">Generator</span></a><span class="result"> extends <a href="DspGeneratorApp.html" class="extype" name="fft.DspGeneratorApp">DspGeneratorApp</a></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@Generator" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.ShiftRegisterMem" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="ShiftRegisterMem"></a>
+      <a id="ShiftRegisterMem:ShiftRegisterMem"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="ShiftRegisterMem$.html"><span class="name">ShiftRegisterMem</span></a>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@ShiftRegisterMem" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li><li name="fft.TotalWidth" visbl="pub" data-isabs="false" fullComment="no" group="Ungrouped">
+      <a id="TotalWidth"></a>
+      <a id="TotalWidth:TotalWidth"></a>
+      <h4 class="signature">
+      <span class="modifier_kind">
+        <span class="modifier"></span>
+        <span class="kind">object</span>
+      </span>
+      <span class="symbol">
+        <a href="TotalWidth$.html"><span class="name">TotalWidth</span></a><span class="result"> extends <span class="extype" name="cde.Field">Field</span>[<span class="extype" name="scala.Int">Int</span>] with <span class="extype" name="scala.Product">Product</span> with <span class="extype" name="scala.Serializable">Serializable</span></span>
+      </span>
+      </h4><span class="permalink">
+      <a href="../index.html#fft.package@TotalWidth" title="Permalink" target="_top">
+        <img src="../lib/permalink.png" alt="Permalink" />
+      </a>
+    </span>
+      
+    </li></ol>
+            </div>
+
+        
+
+        
+        </div>
+
+        <div id="inheritedMembers">
+        
+        
+        </div>
+
+        <div id="groupedMembers">
+        <div class="group" name="Ungrouped">
+              <h3>Ungrouped</h3>
+              
+            </div>
+        </div>
+
+      </div>
+
+      <div id="tooltip"></div>
+
+      <div id="footer">  </div>
+
+
+    </body>
+      </html>
