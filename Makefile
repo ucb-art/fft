@@ -30,3 +30,6 @@ test: $(all_stamps)
 
 travis: $(all_stamps)
 	$(SBT) travis:test
+
+pages: $(all_stamps)
+	$(SBT) ghpagesPushSite
