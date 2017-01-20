@@ -52,14 +52,15 @@ Thus the outputs are X[0], X[8], X[4], X[12] on cycle 0, X[1], X[9], X[5], X[13]
 
 ### Valid
 
-The FFT does not keep track of which bits are valid after coming out of reset, so valid simply passes through the FFT on the same cycle. 
-When valid goes low, all registers in the design are paused.
+The FFT delays the input valid by a value equal to the total data delay (biplex FFT delay + pipeline depth).
+When valid is low, the FFT creates zeros at its input.
+Internal counters continue to count, flushing out extant data.
+The shift register delaying the valid signal is set to all 0s during reset.
 
 ### Sync
 
-Like valid, the FFT does not keep track of the initial state of synchronization coming out of reset, so the sync signal is passed through the FFT after being pipelined appropriately. 
-Thus the first few sync signals at the output coming out of reset maybe be incorrect. 
-But the first input sync signal will set flush through, synchronizing all the FFT butterflies with the first dataset. 
+The shift register delaying the sync signal is set to all 0s during reset.
+The first input sync signal will flush through, synchronizing all the FFT butterflies with the first dataset. 
 The input sync is expected to be periodic in the size of the FFT (n) divided by the number of input lanes (p). 
 Sync should be high on the last cycle of the spectrum. 
 The new spectrum starts on the next valid cycle. 

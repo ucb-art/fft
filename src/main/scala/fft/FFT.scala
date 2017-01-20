@@ -170,6 +170,16 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   val config = p(FFTKey)(p)
 
   val io = IO(new FFTIO[T])
+
+  // feed in zeros when invalid
+  val in = Wire(ValidWithSync(Vec(lanesIn, genIn())))
+  when (io.in.valid) {
+    in.bits := io.in.bits
+  } .otherwise {
+    in.bits := Wire(Vec(lanesIn, DspComplex.wire(implicitly[Real[T]].zero, implicitly[Real[T]].zero)))
+  }
+  in.valid := io.in.valid
+  in.sync := io.in.sync
   
   val direct = Module(new DirectFFT[T])
   io.out <> direct.io.out
@@ -177,8 +187,8 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   if (config.n != lanesIn) {
     val biplex = Module(new BiplexFFT[T])
     direct.io.in := biplex.io.out
-    biplex.io.in <> io.in
+    biplex.io.in <> in
   } else {
-    direct.io.in <> io.in
+    direct.io.in <> in
   }
 }
