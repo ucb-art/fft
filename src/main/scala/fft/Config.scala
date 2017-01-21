@@ -82,31 +82,6 @@ class DspConfig extends Config(
   }) with HasIPXACTParameters {
 
   def getIPXACTParameters: Map[String, String] = {
-    //// Get unadulterated, top level parameters.
-    //val parameterList = List[Field[_]](TLId, PAddrBits)
-    //val parameterMap = parameterList.foldLeft(Map[String, String]()) { (m, s) => m(s.toString) = params(s).toString; m }
-
-    //// Get some nested parameters.
-    //val (nastiDataBits, nastiAddrBits, nastiIdBits) = params(NastiKey) match {
-    //  case NastiParameters(d: Int, a: Int, i: Int) => (d, a, i)
-    //}
-    //parameterMap ++= List(("nastiDataBits", nastiDataBits.toString))
-
-    //// Get some nested parameters, one level deeper.
-    //val (nManagers, dataBits) = params(TLKey(params(TLId))) match {
-    //  case TileLinkParameters(    coherencePolicy: CoherencePolicy,
-    //  nManagers: Int,
-    //  nCachingClients: Int,
-    //  nCachelessClients: Int,
-    //  maxClientXacts: Int,
-    //  maxClientsPerPort: Int,
-    //  maxManagerXacts: Int,
-    //  dataBits: Int,
-    //  dataBeats: Int,
-    //  overrideDataBitsPerBeat: Option[Int]
-    //) => (nManagers.toString, dataBits)
-    //}
-    //parameterMap ++= List(("nManagers", nManagers.toString), ("dataBits", dataBits.toString))
 
     val parameterMap = Map[String, String]()
 
@@ -135,6 +110,14 @@ trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
    def genTwiddle: Option[T] = None
 }
 
+/**
+  * Case class for holding FFT configuration information
+  * Also calculates lots of useful intermediate values for FFTs in general, such as
+  * pipeline register locations and twiddle factors 
+  * @param n Total size of the FFT
+  * @param pipelineDepth Number of pipeline registers inserted (locations automatically chosen)
+  * @param real Not currently used 
+  */
 case class FFTConfig[T<:Data:Real](val n: Int = 8, // n-point FFT
                                    val pipelineDepth: Int = 0,
                                    real: Boolean = false // real inputs?

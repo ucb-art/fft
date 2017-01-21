@@ -16,7 +16,6 @@ resolvers ++= Seq(
 // Provide a managed dependency on X if -DXVersion="" is supplied on the command line.
 val defaultVersions = Map(
   "dsptools" -> "1.0",
-  "dsptools" -> "1.0",
   "rocket-dsp-utils" -> "1.0",
   "chisel3" -> "3.1-SNAPSHOT",
   "chisel-iotesters" -> "1.2-SNAPSHOT"
