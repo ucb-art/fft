@@ -47,10 +47,7 @@ class DspConfig extends Config(
     case TotalWidth => 30
     case BaseAddr => 0
     case FractionalBits => 24
-    case FFTKey => { (q: Parameters) => { 
-      implicit val p = q
-      FFTConfig[FixedPoint](n = site(FFTSize))
-    }}
+    case FFTKey => FFTConfig(n = site(FFTSize), lanes = site(GenKey(site(DspBlockId))).lanesIn)
     //NastiId => "FFT"
 	  case NastiKey => NastiParameters(64, 32, 1)
     case PAddrBits => 32
@@ -69,8 +66,9 @@ class DspConfig extends Config(
           maxManagerXacts = 1,
           dataBeats = 1,
           dataBits = 64)
-    case DspBlockKey => DspBlockParameters(1024, 1024)
-    case GenKey => new GenParameters {
+    case DspBlockId => "fft"
+    case DspBlockKey("fft") => DspBlockParameters(1024, 1024)
+    case GenKey("fft") => new GenParameters {
       //def getReal(): DspReal = DspReal()//DspReal(0.0).cloneType
       def getReal(): FixedPoint = FixedPoint(width=site(TotalWidth), binaryPoint=site(FractionalBits)) 
       def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
@@ -87,7 +85,7 @@ class DspConfig extends Config(
 
     // Conjure up some IPXACT synthsized parameters.
     val fftsize = params(FFTSize)
-    val gk = params(GenKey)
+    val gk = params(GenKey(params(DspBlockId)))
     parameterMap ++= List(("nBands", (fftsize/gk.lanesIn).toString), ("InputLanes", gk.lanesIn.toString),
       ("InputTotalBits", params(TotalWidth).toString), ("OutputLanes", gk.lanesOut.toString), ("OutputTotalBits", params(TotalWidth).toString),
       ("OutputPartialBitReversed", "1"))
@@ -104,7 +102,7 @@ class DspConfig extends Config(
   }
 }
 
-case object FFTKey extends Field[(Parameters) => FFTConfig[FixedPoint]]
+case object FFTKey extends Field[FFTConfig]
 
 trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
    def genTwiddle: Option[T] = None
@@ -116,19 +114,17 @@ trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
   * pipeline register locations and twiddle factors 
   * @param n Total size of the FFT
   * @param pipelineDepth Number of pipeline registers inserted (locations automatically chosen)
+  * @param lanes Number of parallel input and output lanes
   * @param real Not currently used 
   */
-case class FFTConfig[T<:Data:Real](val n: Int = 8, // n-point FFT
-                                   val pipelineDepth: Int = 0,
-                                   real: Boolean = false // real inputs?
-                                  )(implicit val p: Parameters) extends HasGenParameters[T,T] {
-  assert(lanesIn == lanesOut, "FFT must have an equal number of input and output lanes")
-  assert(n >= 4, "For an n-point FFT, n must be 4 or more")
-  assert(lanesIn >= 2, "Must have at least 2 parallel inputs")
-  assert(isPow2(n), "For an n-point FFT, n must be a power of 2")
-  assert(pipelineDepth >= 0, "Cannot have negative pipelining, you silly goose.")
-  assert(lanesIn <= n, "An n-point FFT cannot have more than n inputs (p must be less than or equal to n)")
-  assert(isPow2(lanesIn), "FFT parallelism must be a power of 2")
+case class FFTConfig(n: Int = 8, // n-point FFT
+                     pipelineDepth: Int = 0,
+                     lanes: Int = 8,
+                     real: Boolean = false // real inputs?
+                    ) {
+  require(n >= 4, "For an n-point FFT, n must be 4 or more")
+  require(isPow2(n), "For an n-point FFT, n must be a power of 2")
+  require(pipelineDepth >= 0, "Cannot have negative pipelining, you silly goose.")
 
   // bit reverse a value
   def bit_reverse(in: Int, width: Int): Int = {
@@ -144,7 +140,7 @@ case class FFTConfig[T<:Data:Real](val n: Int = 8, // n-point FFT
   }
 
   // bp stands for biplex points, so the biplex FFT is a bp-point FFT
-  val bp = n/lanesIn
+  val bp = n/lanes
 
   // pipelining
   val num = (log2Up(n)+1).toDouble
@@ -152,7 +148,7 @@ case class FFTConfig[T<:Data:Real](val n: Int = 8, // n-point FFT
   val stages_to_pipeline = (0 until pipelineDepth%log2Up(n)).map(x => if (ratio*(x+1) < num/2 && ratio*(x+1)-0.5 == floor(ratio*(x+1))) floor(ratio*(x+1)).toInt else round(ratio*(x+1)).toInt)
   val pipe = (0 until log2Up(n)).map(x => floor(pipelineDepth/log2Up(n)).toInt + {if (stages_to_pipeline contains (x+1)) 1 else 0})
   val direct_pipe = pipe.drop(log2Up(bp)).foldLeft(0)(_+_)
-  val biplex_pipe = pipe.dropRight(log2Up(lanesIn)).foldLeft(0)(_+_)
+  val biplex_pipe = pipe.dropRight(log2Up(lanes)).foldLeft(0)(_+_)
   println("Pipeline registers inserted on stages: " + pipe.toArray.deep.mkString(","))
   println(s"Total biplex pipeline depth: $biplex_pipe")
   println(s"Total direct pipeline depth: $direct_pipe")
@@ -165,7 +161,7 @@ case class FFTConfig[T<:Data:Real](val n: Int = 8, // n-point FFT
   var prev = Array.fill(log2Up(n))(0)
   for (i <- 1 until n/2) {
     val next = (0 until log2Up(n)).map(x => floor(i/pow(2,x)).toInt).reverse
-    prev.zip(next).foreach{case(lanesIn,n) => {if (n != lanesIn) indices = indices :+ n}}
+    prev.zip(next).foreach{case(lanes,n) => {if (n != lanes) indices = indices :+ n}}
     prev = next.toArray
   }
   indices = indices.map(x => bit_reverse(x, log2Up(n)-1))
@@ -174,7 +170,7 @@ case class FFTConfig[T<:Data:Real](val n: Int = 8, // n-point FFT
   var q = n
   var temp = Array(indices)
   var bindices = Array[Int]()
-  while (q > lanesIn) {
+  while (q > lanes) {
     temp.foreach{x => bindices = bindices ++ x.take(1)}
     temp = temp.map(x => x.drop(1).splitAt((x.size-1)/2)).flatMap(x => Array(x._1, x._2))
     q = q/2

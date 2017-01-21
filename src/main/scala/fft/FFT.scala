@@ -37,7 +37,7 @@ class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasG
   * @tparam T
   */
 class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasFFTGenParameters[DspComplex[T]] {
-  val config = p(FFTKey)(p)
+  val config = p(FFTKey)
 
   val io = IO(new FFTIO[T])
 
@@ -104,7 +104,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   * @tparam T
   */
 class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasFFTGenParameters[DspComplex[T]] {
-  val config = p(FFTKey)(p)
+  val config = p(FFTKey)
 
   val io = IO(new FFTIO[T])
 
@@ -167,7 +167,12 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   * @tparam T
   */
 class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
-  val config = p(FFTKey)(p)
+  val config = p(FFTKey)
+
+  require(lanesIn == lanesOut, "FFT must have an equal number of input and output lanes")
+  require(lanesIn >= 2, "Must have at least 2 parallel inputs")
+  require(isPow2(lanesIn), "FFT parallelism must be a power of 2")
+  require(lanesIn <= config.n, "An n-point FFT cannot have more than n inputs (p must be less than or equal to n)")
 
   val io = IO(new FFTIO[T])
 
