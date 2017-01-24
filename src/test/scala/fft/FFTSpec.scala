@@ -13,7 +13,10 @@ import firrtl_interpreter.InterpreterOptions
 import dsptools.numbers.{DspReal, SIntOrder, SIntRing}
 import dsptools.{DspContext, DspTester, Grow}
 import org.scalatest.{FlatSpec, Matchers}
-//import dsptools.numbers.implicits._
+
+// comment when using FixedPoint, uncomment for DspReal
+import dsptools.numbers.implicits._
+
 import dsptools.numbers.{DspComplex, Real}
 import scala.util.Random
 import scala.math._
@@ -35,7 +38,8 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
   // grab some parameters and configuration stuff
   val config = p(FFTKey)(p)
   val gk = p(GenKey)
-  val test_length = 1
+  val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
+  val test_length = config.bp + config.pipelineDepth + stage_delays.reduce(_+_)
 
   // bit reverse a value
   def bit_reverse(in: Integer, width: Integer): Integer = {
@@ -50,18 +54,24 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
     out
   }
 
-  // unscramble
-  def unscramble(in: Seq[Seq[Complex]]): Seq[Complex] = {
+  // unscramble, expects a single array of size n
+  def unscramble(in: Seq[Complex]): Seq[Complex] = {
     val p = gk.lanesIn
     val n = config.n
-    assert(n/p == in.size, "Error: cannot unscramble input $in")
-    assert(p == in(0).size, "Error: cannot unscramble input $in")
+    val bp = n/p
+    assert(n == in.size, s"Error: input $in has the wrong length, expected $n but got ${in.size}")
 
     val res = Array.fill(n)(Complex(0.0,0.0))
-    in.zipWithIndex.foreach { case (set, sindex) => 
+    in.grouped(p).zipWithIndex.foreach { case (set, sindex) => 
       set.zipWithIndex.foreach { case (bin, bindex) => 
-        val new_index = bit_reverse(bindex, log2Up(n))+sindex
-        res(new_index) = bin
+        if (bp > 1) {
+          val p1 = if (sindex/(bp/2) >= 1) 1 else 0
+          val new_index = bit_reverse((sindex % (bp/2)) * 2 + p1, log2Up(bp)) + bit_reverse(bindex, log2Up(n))
+          res(new_index) = bin
+        } else {
+          val new_index = bit_reverse(bindex, log2Up(n))
+          res(new_index) = bin
+        }
       }
     }
     res
@@ -73,7 +83,7 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
   def streamIn = packInputStream(input, gk.genIn)
 
   // calculate expected output
-  val expected_output = fourierTr(DenseVector(input.toArray.flatten)).toArray
+  val expected_output = fourierTr(DenseVector(input.take(config.bp).toArray.flatten)).toArray
 
   // reset 5 cycles
   reset(5)
@@ -81,7 +91,7 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
   // run test
   playStream
   step(test_length)
-  val output = unscramble(Seq(unpackOutputStream(gk.genOut, gk.lanesOut)))
+  val output = unscramble(unpackOutputStream(gk.genOut, gk.lanesOut))
 
   // print out data sets for visual confirmation
   println("Input")
@@ -93,7 +103,7 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
 
   // compare results, only works for DC impulse spectra right now
   // TODO: unscramble, handle multi-cycle data sets
-  compareOutputComplex(output, expected_output, 1e-4)
+  compareOutputComplex(output, expected_output, 5e-2)
 }
 
 class FFTSpec extends FlatSpec with Matchers {
@@ -105,12 +115,12 @@ class FFTSpec extends FlatSpec with Matchers {
 
   it should "work with DspBlockTester" in {
     implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
-    implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal { 
-      override def fromDouble(x: Double): FixedPoint = {
-        FixedPoint.fromDouble(x, binaryPoint = p(FractionalBits))
-      }
-    } 
-    val dut = () => LazyModule(new LazyFFTBlock[FixedPoint]).module
+    //implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal { 
+    //  override def fromDouble(x: Double): FixedPoint = {
+    //    FixedPoint.fromDouble(x, binaryPoint = p(FractionalBits))
+    //  }
+    //} 
+    val dut = () => LazyModule(new LazyFFTBlock[DspReal]).module
     chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTTester(c) } should be (true)
   }
 

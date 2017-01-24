@@ -44,7 +44,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   // synchronize
   val sync = CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
   io.out.sync := ShiftRegisterWithReset(io.in.sync, config.direct_pipe, 0.U, io.in.valid)
-  io.out.valid := io.in.valid
+  io.out.valid := ShiftRegisterWithReset(io.in.valid, config.direct_pipe, 0.U, true.B)
 
   // wire up twiddles
   val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genIn())))
@@ -114,7 +114,7 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   sync(0) := CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
   sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegisterWithReset(prev, delay, 0.U, io.in.valid) }
   io.out.sync := sync(log2Up(config.bp)) === UInt((config.bp/2-1+config.biplex_pipe)%config.bp)
-  io.out.valid := io.in.valid
+  io.out.valid := ShiftRegisterWithReset(io.in.valid, stage_delays.reduce(_+_) + config.biplex_pipe, 0.U, true.B)
 
   // wire up twiddles
   val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genIn())))
