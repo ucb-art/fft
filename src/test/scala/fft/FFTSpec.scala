@@ -33,11 +33,11 @@ import dsptools._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
-class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBlockTester(c)(p) {
+class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBlockTester(c) {
 
   // grab some parameters and configuration stuff
-  val config = p(FFTKey)(p)
-  val gk = p(GenKey)
+  def config = p(FFTKey)
+  def gk = p(GenKey(p(DspBlockId)))
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
   val test_length = config.bp + config.pipelineDepth + stage_delays.reduce(_+_)
 
@@ -78,9 +78,23 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
   }
 
   // random input data
-  val input = Seq.fill(test_length)(Seq.fill(gk.lanesIn)(Complex(Random.nextDouble*2+1, Random.nextDouble*2+1)))
+  def input = Seq.fill(test_length * config.n)(Seq.fill(gk.lanesIn)(Complex(Random.nextDouble*2+1, Random.nextDouble*2+1)))
   //val input = Seq.fill(test_length)(Seq.fill(gk.lanesIn)(Complex(-1.4, -2.22)))
-  def streamIn = packInputStream(input, gk.genIn)
+
+  def streamIn = {
+    println(s"gk is $gk")
+    gk.genIn[DspComplex[FixedPoint]] match {
+    case gen: DspComplex[FixedPoint] => {
+      println(s"gen is $gen")
+      // println(s"underlying type is ${gen.underlyingType()}")
+      println(s"input is $input")
+      val a = packInputStream(input, gen)
+      println(s"packed input is $a")
+      a
+    }
+    case _ => throw new Exception(s"genIn needs to be DspComplex, not $gk.genIn")
+  }
+  }
 
   // calculate expected output
   val expected_output = fourierTr(DenseVector(input.take(config.bp).toArray.flatten)).toArray
@@ -90,8 +104,8 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
 
   // run test
   playStream
-  step(test_length)
-  val output = unscramble(unpackOutputStream(gk.genOut, gk.lanesOut))
+  step(test_length * config.n)
+  val output = unscramble(unpackOutputStream(gk.genOut, gk.lanesOut).grouped(gk.lanesIn).toSeq)
 
   // print out data sets for visual confirmation
   println("Input")

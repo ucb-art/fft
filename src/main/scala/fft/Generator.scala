@@ -361,8 +361,8 @@ trait DspGeneratorApp extends GeneratorApp {
   }
 
   def generateIPXact {
-    val bits_in = params(DspBlockKey).inputWidth
-    val bits_out = params(DspBlockKey).outputWidth
+    val bits_in = params(DspBlockKey(params(DspBlockId))).inputWidth
+    val bits_out = params(DspBlockKey(params(DspBlockId))).outputWidth
     val factory = new ObjectFactory
     val memMapName = "mm"
 
