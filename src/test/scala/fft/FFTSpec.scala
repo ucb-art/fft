@@ -7,6 +7,7 @@ import breeze.math.{Complex}
 import breeze.signal.{fourierTr}
 import breeze.linalg._
 import chisel3._
+import chisel3.experimental._
 import chisel3.util._
 import chisel3.iotesters._
 import firrtl_interpreter.InterpreterOptions
@@ -26,6 +27,7 @@ import junctions._
 import uncore.tilelink._
 import uncore.coherence._
 
+import craft._
 import dsptools._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
@@ -33,7 +35,7 @@ object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBlockTester(c) {
 
   // grab some parameters and configuration stuff
-  def config = p(FFTKey)
+  def config = p(FFTKey(p(DspBlockId)))
   def gk = p(GenKey(p(DspBlockId)))
   val test_length = 1
 
@@ -59,8 +61,8 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
     in.foreach { i => require(p == i.size, s"Error: cannot unscramble input $in") }
 
     val res = Array.fill(n)(Complex(0.0,0.0))
-    in.zipWithIndex.foreach { case (set, sindex) => 
-      set.zipWithIndex.foreach { case (bin, bindex) => 
+    in.zipWithIndex.foreach { case (set, sindex) =>
+      set.zipWithIndex.foreach { case (bin, bindex) =>
         val new_index = bit_reverse(bindex, log2Up(n))+sindex
         res(new_index) = bin
       }
@@ -112,6 +114,8 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
 }
 
 class FFTSpec extends FlatSpec with Matchers {
+  val totalWidth = 32
+  val fractionalBits = 16
   behavior of "FFT"
   val manager = new TesterOptionsManager {
     testerOptions = TesterOptions(backendName = "firrtl", testerSeed = 7L)
@@ -119,12 +123,16 @@ class FFTSpec extends FlatSpec with Matchers {
   }
 
   it should "work with DspBlockTester" in {
-    implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
-    implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal { 
+    implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal {
       override def fromDouble(x: Double): FixedPoint = {
-        FixedPoint.fromDouble(x, binaryPoint = p(FractionalBits))
+        FixedPoint.fromDouble(x, binaryPoint = fractionalBits)
       }
-    } 
+    }
+    implicit val p: Parameters = Parameters.root(
+      FFTConfigBuilder(
+        "fft",
+        FFTConfig(),
+        {() => FixedPoint(totalWidth.W, fractionalBits.BP)}).toInstance)
     val dut = () => LazyModule(new LazyFFTBlock[FixedPoint]).module
     chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTTester(c) } should be (true)
   }
