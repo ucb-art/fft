@@ -7,6 +7,7 @@ import breeze.math.{Complex}
 import breeze.signal.{fourierTr}
 import breeze.linalg._
 import chisel3._
+import chisel3.experimental._
 import chisel3.util._
 import chisel3.iotesters._
 import firrtl_interpreter.InterpreterOptions
@@ -29,6 +30,7 @@ import junctions._
 import uncore.tilelink._
 import uncore.coherence._
 
+import craft._
 import dsptools._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
@@ -36,7 +38,7 @@ object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBlockTester(c) {
 
   // grab some parameters and configuration stuff
-  def config = p(FFTKey)
+  def config = p(FFTKey(p(DspBlockId)))
   def gk = p(GenKey(p(DspBlockId)))
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
   val test_length = config.bp + config.pipelineDepth + stage_delays.reduce(_+_)
@@ -62,6 +64,7 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
     assert(n == in.size, s"Error: input $in has the wrong length, expected $n but got ${in.size}")
 
     val res = Array.fill(n)(Complex(0.0,0.0))
+<<<<<<< HEAD
     in.grouped(p).zipWithIndex.foreach { case (set, sindex) => 
       set.zipWithIndex.foreach { case (bin, bindex) => 
         if (bp > 1) {
@@ -72,6 +75,12 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
           val new_index = bit_reverse(bindex, log2Up(n))
           res(new_index) = bin
         }
+=======
+    in.zipWithIndex.foreach { case (set, sindex) =>
+      set.zipWithIndex.foreach { case (bin, bindex) =>
+        val new_index = bit_reverse(bindex, log2Up(n))+sindex
+        res(new_index) = bin
+>>>>>>> refactorConfig
       }
     }
     res
@@ -121,6 +130,8 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
 }
 
 class FFTSpec extends FlatSpec with Matchers {
+  val totalWidth = 32
+  val fractionalBits = 16
   behavior of "FFT"
   val manager = new TesterOptionsManager {
     testerOptions = TesterOptions(backendName = "firrtl", testerSeed = 7L)
@@ -128,13 +139,17 @@ class FFTSpec extends FlatSpec with Matchers {
   }
 
   it should "work with DspBlockTester" in {
-    implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
-    //implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal { 
-    //  override def fromDouble(x: Double): FixedPoint = {
-    //    FixedPoint.fromDouble(x, binaryPoint = p(FractionalBits))
-    //  }
-    //} 
-    val dut = () => LazyModule(new LazyFFTBlock[DspReal]).module
+    implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal {
+      override def fromDouble(x: Double): FixedPoint = {
+        FixedPoint.fromDouble(x, binaryPoint = fractionalBits)
+      }
+    }
+    implicit val p: Parameters = Parameters.root(
+      FFTConfigBuilder(
+        "fft",
+        FFTConfig(),
+        {() => FixedPoint(totalWidth.W, fractionalBits.BP)}).toInstance)
+    val dut = () => LazyModule(new LazyFFTBlock[FixedPoint]).module
     chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTTester(c) } should be (true)
   }
 

@@ -10,6 +10,7 @@ import java.math.BigInteger
 import rocketchip._
 import junctions._
 import cde.Parameters
+import craft._
 import dspjunctions._
 import dspblocks._
 import dsptools._
@@ -345,10 +346,9 @@ trait DspGeneratorApp extends GeneratorApp {
     fileSets
   }
 
-  def makeParameters(factory: ObjectFactory): SpiritParameters = {
+  def makeParameters(id: String, factory: ObjectFactory): SpiritParameters = {
     val parameters = new SpiritParameters()
-    val config = new DspConfig()
-    for ( (name, value) <- config.getIPXACTParameters) {
+    for ( (name, value) <- params(IPXACTParameters(id))) {
       println("parameter: %s, value: %s".format(name, value))
       val nameValuePairType = new NameValuePairType
       nameValuePairType.setName(name)
@@ -360,7 +360,7 @@ trait DspGeneratorApp extends GeneratorApp {
     parameters
   }
 
-  def generateIPXact {
+  def generateIPXact(id: String) {
     val bits_in = params(DspBlockKey(params(DspBlockId))).inputWidth
     val bits_out = params(DspBlockKey(params(DspBlockId))).outputWidth
     val factory = new ObjectFactory
@@ -400,7 +400,7 @@ trait DspGeneratorApp extends GeneratorApp {
     componentType.setMemoryMaps(memoryMaps)
     componentType.setModel(model)
     componentType.setFileSets(makeFileSets(factory))
-    componentType.setParameters(makeParameters(factory))
+    componentType.setParameters(makeParameters(id, factory))
 
     val component = factory.createComponent(componentType)
 
@@ -417,5 +417,5 @@ trait DspGeneratorApp extends GeneratorApp {
 object Generator extends DspGeneratorApp {
   val longName = names.fullTopModuleClass + "." + names.configs
   generateFirrtl
-  generateIPXact
+  generateIPXact("fft")
 }
