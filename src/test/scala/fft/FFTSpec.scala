@@ -16,7 +16,7 @@ import dsptools.{DspContext, DspTester, Grow}
 import org.scalatest.{FlatSpec, Matchers}
 
 // comment when using FixedPoint, uncomment for DspReal
-import dsptools.numbers.implicits._
+// import dsptools.numbers.implicits._
 
 import dsptools.numbers.{DspComplex, Real}
 import scala.util.Random
@@ -64,7 +64,6 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
     assert(n == in.size, s"Error: input $in has the wrong length, expected $n but got ${in.size}")
 
     val res = Array.fill(n)(Complex(0.0,0.0))
-<<<<<<< HEAD
     in.grouped(p).zipWithIndex.foreach { case (set, sindex) => 
       set.zipWithIndex.foreach { case (bin, bindex) => 
         if (bp > 1) {
@@ -75,12 +74,6 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
           val new_index = bit_reverse(bindex, log2Up(n))
           res(new_index) = bin
         }
-=======
-    in.zipWithIndex.foreach { case (set, sindex) =>
-      set.zipWithIndex.foreach { case (bin, bindex) =>
-        val new_index = bit_reverse(bindex, log2Up(n))+sindex
-        res(new_index) = bin
->>>>>>> refactorConfig
       }
     }
     res
@@ -114,7 +107,7 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
   // run test
   playStream
   step(test_length * config.n)
-  val output = unscramble(unpackOutputStream(gk.genOut, gk.lanesOut).grouped(gk.lanesIn).toSeq)
+  val output = unscramble(unpackOutputStream(gk.genOut, gk.lanesOut))
 
   // print out data sets for visual confirmation
   println("Input")
