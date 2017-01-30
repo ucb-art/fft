@@ -7,6 +7,7 @@ import breeze.math.{Complex}
 import breeze.signal.{fourierTr}
 import breeze.linalg._
 import chisel3._
+import chisel3.experimental._
 import chisel3.util._
 import chisel3.iotesters._
 import firrtl_interpreter.InterpreterOptions
@@ -39,7 +40,7 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
   def config = p(FFTKey)
   def gk = p(GenKey(p(DspBlockId)))
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
-  val test_length = config.bp + config.pipelineDepth + stage_delays.reduce(_+_)
+  val test_length = config.bp + config.pipelineDepth + stage_delays.reduce(_+_) + 10
 
   // bit reverse a value
   def bit_reverse(in: Integer, width: Integer): Integer = {
@@ -104,8 +105,8 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
 
   // run test
   playStream
-  step(test_length * config.n)
-  val output = unscramble(unpackOutputStream(gk.genOut, gk.lanesOut).grouped(gk.lanesIn).toSeq)
+  step(test_length)
+  val output = unscramble(unpackOutputStream(gk.genOut, gk.lanesOut))
 
   // print out data sets for visual confirmation
   println("Input")
@@ -135,7 +136,7 @@ class FFTSpec extends FlatSpec with Matchers {
     //  }
     //} 
     val dut = () => LazyModule(new LazyFFTBlock[DspReal]).module
-    chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTTester(c) } should be (true)
+    dsptools.Driver.execute(dut, manager) { c => new FFTTester(c) } should be (true)
   }
 
 }
