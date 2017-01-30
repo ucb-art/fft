@@ -16,7 +16,7 @@ import dsptools.{DspContext, DspTester, Grow}
 import org.scalatest.{FlatSpec, Matchers}
 
 // comment when using FixedPoint, uncomment for DspReal
-import dsptools.numbers.implicits._
+// import dsptools.numbers.implicits._
 
 import dsptools.numbers.{DspComplex, Real}
 import scala.util.Random
@@ -30,6 +30,7 @@ import junctions._
 import uncore.tilelink._
 import uncore.coherence._
 
+import craft._
 import dsptools._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
@@ -37,7 +38,7 @@ object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBlockTester(c) {
 
   // grab some parameters and configuration stuff
-  def config = p(FFTKey)
+  def config = p(FFTKey(p(DspBlockId)))
   def gk = p(GenKey(p(DspBlockId)))
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
   val test_length = config.bp + config.pipelineDepth + stage_delays.reduce(_+_) + 10
@@ -122,6 +123,8 @@ class FFTTester[T <: Data](c: FFTBlock[T])(implicit p: Parameters) extends DspBl
 }
 
 class FFTSpec extends FlatSpec with Matchers {
+  val totalWidth = 32
+  val fractionalBits = 16
   behavior of "FFT"
   val manager = new TesterOptionsManager {
     testerOptions = TesterOptions(backendName = "firrtl", testerSeed = 7L)

@@ -4,6 +4,7 @@ import breeze.math.{Complex}
 import breeze.signal.{fourierTr}
 import breeze.linalg._
 import chisel3._
+import chisel3.experimental._
 import chisel3.util._
 import chisel3.iotesters._
 import firrtl_interpreter.InterpreterOptions
@@ -25,84 +26,60 @@ import uncore.coherence._
 
 import fft.Generator.params
 
+import craft._
 import dsptools._
+import dsptools.numbers.{Field=>_,_}
+import dsptools.numbers.implicits._
 
 import scala.collection.mutable.Map
 
-trait HasIPXACTParameters {
-  def getIPXACTParameters: Map[String, String]
+object FFTConfigBuilder {
+  def apply[T <: Data : Real](
+    id: String, fftConfig: FFTConfig, gen: () => T): Config = new Config(
+    (pname, site, here) => pname match {
+      // case FFTSize => 8
+      // case TotalWidth => 30
+      case FFTKey(id) => fftConfig
+      case IPXACTParameters(id) => {
+        val parameterMap = Map[String, String]()
+
+        // Conjure up some IPXACT synthsized parameters.
+        val gk = site(GenKey(id))
+        val fftsize = fftConfig.n
+        val totalWidth = gk.lanesIn * gen().getWidth
+        parameterMap ++= List(
+          ("nBands", (fftsize/gk.lanesIn).toString),
+          ("InputLanes", gk.lanesIn.toString),
+          ("InputTotalBits", totalWidth.toString),
+          ("OutputLanes", gk.lanesOut.toString),
+          ("OutputTotalBits", totalWidth.toString),
+          ("OutputPartialBitReversed", "1")
+        )
+
+        // add fractional bits if it's fixed point
+        // TODO: check if it's fixed point or not
+        gen() match {
+          case fp: FixedPoint =>
+            val fractionalBits = fp.binaryPoint
+            parameterMap ++= List(
+              ("InputFractionalBits", fractionalBits.toString),
+              ("OutputFractionalBits", fractionalBits.toString)
+            )
+          case _ =>
+        }
+
+        // tech stuff, TODO
+        parameterMap ++= List(("ClockRate", "100"), ("Technology", "TSMC16nm"))
+
+        parameterMap
+      }
+      case _ => throw new CDEMatchError
+    }) ++
+  ConfigBuilder.buildDSP(id, {implicit p: Parameters => new LazyFFTBlock[T]}) ++
+  ConfigBuilder.dspBlockParams(id, fftConfig.lanes, () => DspComplex(gen(), gen()))
 }
 
-case object FFTSize extends Field[Int]
-case object TotalWidth extends Field[Int]
-case object FractionalBits extends Field[Int]
-
-// create a new DSP Configuration
-class DspConfig extends Config(
-  (pname, site, here) => pname match {
-    case BuildDSP => q: Parameters =>
-      implicit val p = q
-      new LazyFFTBlock[DspReal]
-    case FFTSize => 4
-    case TotalWidth => 16
-    case BaseAddr => 0
-    case FractionalBits => 8
-    case FFTKey => FFTConfig(n = site(FFTSize), lanes = site(GenKey(site(DspBlockId))).lanesIn)
-    //NastiId => "FFT"
-	  case NastiKey => NastiParameters(64, 32, 1)
-    case PAddrBits => 32
-    case CacheBlockOffsetBits => 6
-    case AmoAluOperandBits => 64
-    case TLId => "FFT"
-    case TLKey("FFT") =>
-        TileLinkParameters(
-          coherencePolicy = new MICoherence(
-            new NullRepresentation(1)),
-          nManagers = 1,
-          nCachingClients = 0,
-          nCachelessClients = 1,
-          maxClientXacts = 4,
-          maxClientsPerPort = 1,
-          maxManagerXacts = 1,
-          dataBeats = 1,
-          dataBits = 64)
-    case DspBlockId => "fft"
-    case DspBlockKey("fft") => DspBlockParameters(1024, 1024)
-    case GenKey("fft") => new GenParameters {
-      def getReal(): DspReal = DspReal()//DspReal(0.0).cloneType
-      //def getReal(): FixedPoint = FixedPoint(width=site(TotalWidth), binaryPoint=site(FractionalBits)) 
-      def genIn [T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
-      override def genOut[T <: Data] = DspComplex(getReal(), getReal()).asInstanceOf[T]
-      val lanesIn = 4
-      override val lanesOut = 4
-    }
-    case _ => throw new CDEMatchError
-  }) with HasIPXACTParameters {
-
-  def getIPXACTParameters: Map[String, String] = {
-
-    val parameterMap = Map[String, String]()
-
-    // Conjure up some IPXACT synthsized parameters.
-    val fftsize = params(FFTSize)
-    val gk = params(GenKey(params(DspBlockId)))
-    parameterMap ++= List(("nBands", (fftsize/gk.lanesIn).toString), ("InputLanes", gk.lanesIn.toString),
-      ("InputTotalBits", params(TotalWidth).toString), ("OutputLanes", gk.lanesOut.toString), ("OutputTotalBits", params(TotalWidth).toString),
-      ("OutputPartialBitReversed", "1"))
-
-    // add fractional bits if it's fixed point
-    // TODO: check if it's fixed point or not
-    parameterMap ++= List(("InputFractionalBits", params(FractionalBits).toString), 
-      ("OutputFractionalBits", params(FractionalBits).toString))
-
-    // tech stuff, TODO
-    parameterMap ++= List(("ClockRate", "100"), ("Technology", "TSMC16nm"))
-
-    parameterMap
-  }
-}
-
-case object FFTKey extends Field[FFTConfig]
+case class FFTKey(id: String) extends Field[FFTConfig]
 
 trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
    def genTwiddle: Option[T] = None
@@ -111,11 +88,11 @@ trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
 /**
   * Case class for holding FFT configuration information
   * Also calculates lots of useful intermediate values for FFTs in general, such as
-  * pipeline register locations and twiddle factors 
+  * pipeline register locations and twiddle factors
   * @param n Total size of the FFT
   * @param pipelineDepth Number of pipeline registers inserted (locations automatically chosen)
   * @param lanes Number of parallel input and output lanes
-  * @param real Not currently used 
+  * @param real Not currently used
   */
 case class FFTConfig(n: Int = 8, // n-point FFT
                      pipelineDepth: Int = 0,
