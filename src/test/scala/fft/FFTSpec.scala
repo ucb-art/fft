@@ -132,14 +132,18 @@ class FFTSpec extends FlatSpec with Matchers {
   }
 
   it should "work with DspBlockTester" in {
-    implicit val p: Parameters = Parameters.root(new DspConfig().toInstance)
-    //implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal { 
-    //  override def fromDouble(x: Double): FixedPoint = {
-    //    FixedPoint.fromDouble(x, binaryPoint = p(FractionalBits))
-    //  }
-    //} 
-    val dut = () => LazyModule(new LazyFFTBlock[DspReal]).module
-    dsptools.Driver.execute(dut, manager) { c => new FFTTester(c) } should be (true)
+    implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal {
+      override def fromDouble(x: Double): FixedPoint = {
+        FixedPoint.fromDouble(x, binaryPoint = fractionalBits)
+      }
+    }
+    implicit val p: Parameters = Parameters.root(
+      FFTConfigBuilder.standalone(
+        "fft",
+        FFTConfig(),
+        {() => FixedPoint(totalWidth.W, fractionalBits.BP)}).toInstance)
+    val dut = () => LazyModule(new LazyFFTBlock[FixedPoint]).module
+    chisel3.iotesters.Driver.execute(dut, manager) { c => new FFTTester(c) } should be (true)
   }
 
 }

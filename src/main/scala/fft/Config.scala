@@ -24,8 +24,6 @@ import junctions._
 import uncore.tilelink._
 import uncore.coherence._
 
-import fft.Generator.params
-
 import craft._
 import dsptools._
 import dsptools.numbers.{Field=>_,_}
@@ -37,8 +35,6 @@ object FFTConfigBuilder {
   def apply[T <: Data : Real](
     id: String, fftConfig: FFTConfig, gen: () => T): Config = new Config(
     (pname, site, here) => pname match {
-      // case FFTSize => 8
-      // case TotalWidth => 30
       case FFTKey(id) => fftConfig
       case IPXACTParameters(id) => {
         val parameterMap = Map[String, String]()
@@ -75,9 +71,14 @@ object FFTConfigBuilder {
       }
       case _ => throw new CDEMatchError
     }) ++
-  ConfigBuilder.buildDSP(id, {implicit p: Parameters => new LazyFFTBlock[T]}) ++
   ConfigBuilder.dspBlockParams(id, fftConfig.lanes, () => DspComplex(gen(), gen()))
+  def standalone[T <: Data : Real](
+    id: String, fftConfig: FFTConfig, gen: () => T): Config =
+    apply(id, fftConfig, gen) ++
+    ConfigBuilder.buildDSP(id, {implicit p: Parameters => new LazyFFTBlock[T]})
 }
+
+class DefaultStandaloneRealFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => DspReal()))
 
 case class FFTKey(id: String) extends Field[FFTConfig]
 

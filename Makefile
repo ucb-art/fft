@@ -10,15 +10,15 @@ FIRRTL ?= java -Xmx2G -Xss8M -cp $(FIRRTL_JAR) firrtl.Driver
 
 CHISEL_ARGS ?= 
 build_dir ?= generated-src
-PROJECT ?= fft
-MODEL ?= TestHarness
-CFG_PROJECT ?= $(PROJECT)
-CONFIG ?= DspConfig
+PROJECT ?= craft
+MODEL ?= DspTop
+CFG_PROJECT ?= fft
+CONFIG ?= DefaultStandaloneRealFFTConfig
 
 
 $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir: $(rocketchip_stamp) $(extra_stamps) $(call lookup_scala_srcs,$(base_dir)/src/main/scala)
 	mkdir -p $(build_dir)
-	cd $(base_dir) && $(SBT) "run-main $(PROJECT).Generator $(CHISEL_ARGS) $(build_dir) $(PROJECT) $(MODEL) $(CFG_PROJECT) $(CONFIG)"
+	cd $(base_dir) && $(SBT) "run-main $(PROJECT).DspBlockGenerator $(CHISEL_ARGS) $(build_dir) $(PROJECT) $(MODEL) $(CFG_PROJECT) $(CONFIG)"
 
 $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).v: $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir
 	$(FIRRTL) -i $< -o $@ -X verilog
