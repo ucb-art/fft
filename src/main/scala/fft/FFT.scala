@@ -47,12 +47,12 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   io.out.valid := ShiftRegisterWithReset(io.in.valid, config.direct_pipe, 0.U, true.B)
 
   // wire up twiddles
-  val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genIn())))
-  twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(implicitly[Real[T]].fromDouble(value(0)), implicitly[Real[T]].fromDouble(value(1))) }
+  val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genOut())))
+  twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(Real[T].fromDouble(value(0)), Real[T].fromDouble(value(1))) }
   val indices_rom = Vec(config.dindices.map(x => UInt(x)))
   // TODO: make this not a multiply
   val start = sync*UInt(lanesIn-1)
-  val twiddle = Vec.fill(lanesIn-1)(Wire(genTwiddle.getOrElse(genIn())))
+  val twiddle = Vec.fill(lanesIn-1)(Wire(genTwiddle.getOrElse(genOut())))
   // special case when n = 4, because the pattern breaks down
   if (config.n == 4) {
     twiddle := Vec((0 until lanesIn-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(0)), twiddle_rom(0))))
@@ -62,7 +62,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
 
   // p-point decimation-in-time direct form FFT with inputs in normal order (outputs bit reversed)
   // TODO: change type? should it all be genIn?
-  val stage_outputs = List.fill(log2Up(lanesIn)+1)(List.fill(lanesIn)(Wire(genIn())))
+  val stage_outputs = List.fill(log2Up(lanesIn)+1)(List.fill(lanesIn)(Wire(genOut())))
   io.in.bits.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
 
   // indices to the twiddle Vec
@@ -117,11 +117,11 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   io.out.valid := ShiftRegisterWithReset(io.in.valid, stage_delays.reduce(_+_) + config.biplex_pipe, 0.U, true.B)
 
   // wire up twiddles
-  val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genIn())))
-  twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(implicitly[Real[T]].fromDouble(value(0)), implicitly[Real[T]].fromDouble(value(1))) }
+  val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genOut())))
+  twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(Real[T].fromDouble(value(0)), Real[T].fromDouble(value(1))) }
   val indices_rom = Vec(config.bindices.map(x => UInt(x)))
   val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegisterMem(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_), io.in.valid)(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
-  val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genIn())))
+  val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genOut())))
   // special cases
   if (config.n == 4) {
     twiddle := Vec((0 until log2Up(config.bp)).map(x => Mux(indices(x)(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(0)), twiddle_rom(0))))
@@ -133,7 +133,7 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
 
   // bp-point decimation-in-time biplex pipelined FFT with outputs in bit-reversed order
   // TODO: change type? should it all be genIn?
-  val stage_outputs = List.fill(log2Up(config.bp)+2)(List.fill(lanesIn)(Wire(genIn())))
+  val stage_outputs = List.fill(log2Up(config.bp)+2)(List.fill(lanesIn)(Wire(genOut())))
   io.in.bits.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
 
   // create the FFT hardware
@@ -181,7 +181,7 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   when (io.in.valid) {
     in.bits := io.in.bits
   } .otherwise {
-    in.bits := Wire(Vec(lanesIn, DspComplex.wire(implicitly[Real[T]].zero, implicitly[Real[T]].zero)))
+    in.bits := Wire(Vec(lanesIn, DspComplex.wire(Real[T].zero, Real[T].zero)))
   }
   in.valid := io.in.valid
   in.sync := io.in.sync
