@@ -42,8 +42,9 @@ object FFTConfigBuilder {
         // Conjure up some IPXACT synthsized parameters.
         val gk = site(GenKey(id))
         val fftsize = fftConfig.n
-        val totalWidthIn = gk.lanesIn * genIn().getWidth
-        val totalWidthOut = gk.lanesOut * genOut.getOrElse(genIn)().getWidth
+        // double these because genIn is underlying type, but input is complex
+        val totalWidthIn = gk.lanesIn * genIn().getWidth * 2 
+        val totalWidthOut = gk.lanesOut * genOut.getOrElse(genIn)().getWidth * 2
         parameterMap ++= List(
           ("nBands", (fftsize/gk.lanesIn).toString),
           ("InputLanes", gk.lanesIn.toString),
@@ -59,7 +60,7 @@ object FFTConfigBuilder {
           case fp: FixedPoint =>
             val fractionalBits = fp.binaryPoint
             parameterMap ++= List(
-              ("InputFractionalBits", fractionalBits.toString)
+              ("InputFractionalBits", fractionalBits.get.toString)
             )
           case _ =>
         }
@@ -67,7 +68,7 @@ object FFTConfigBuilder {
           case fp: FixedPoint =>
             val fractionalBits = fp.binaryPoint
             parameterMap ++= List(
-              ("OutputFractionalBits", fractionalBits.toString)
+              ("OutputFractionalBits", fractionalBits.get.toString)
             )
           case _ =>
         }
