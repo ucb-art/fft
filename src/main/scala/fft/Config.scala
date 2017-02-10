@@ -87,8 +87,8 @@ object FFTConfigBuilder {
     ConfigBuilder.buildDSP(id, {implicit p: Parameters => new LazyFFTBlock[T]})
 }
 
-class DefaultStandaloneRealFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => DspReal()))
-class DefaultStandaloneFixedPointFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => FixedPoint(16.W, 8.BP), Some(() => FixedPoint(20.W, 8.BP))))
+class DefaultStandaloneRealFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(n=128), () => DspReal()))
+class DefaultStandaloneFixedPointFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(n=128), () => FixedPoint(16.W, 8.BP), Some(() => FixedPoint(20.W, 8.BP))))
 
 case class FFTKey(id: String) extends Field[FFTConfig]
 
