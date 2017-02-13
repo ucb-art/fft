@@ -22,7 +22,7 @@ CONFIG ?= DefaultStandaloneRealFFTConfig
 MEM_GEN ?= $(base_dir)/src/main/python/vlsi_mem_gen
 
 
-$(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir: $(rocketchip_stamp) $(extra_stamps) $(call lookup_scala_srcs,$(base_dir)/src/main/scala)
+$(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir: $(all_stamps) $(call lookup_scala_srcs,$(base_dir)/src/main/scala)
 	mkdir -p $(build_dir)
 	cd $(base_dir) && $(SBT) "run-main $(PROJECT).DspGenerator $(CHISEL_ARGS) $(build_dir) $(PROJECT) $(MODEL) $(CFG_PROJECT) $(CONFIG)"
 
