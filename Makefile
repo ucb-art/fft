@@ -17,7 +17,7 @@ build_dir ?= generated-src
 PROJECT ?= craft
 MODEL ?= DspTop
 CFG_PROJECT ?= fft
-CONFIG ?= DefaultStandaloneRealFFTConfig
+CONFIG ?= DefaultStandaloneFixedPointFFTConfig
 
 MEM_GEN ?= $(base_dir)/src/main/python/vlsi_mem_gen
 

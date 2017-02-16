@@ -8,7 +8,7 @@ import chisel3.util._
 import chisel3._
 import chisel3.core.ExplicitCompileOptions
 import dsptools._
-import dsptools.numbers.{DspComplex, Real, DspReal}
+import dsptools.numbers._
 import dsptools.numbers.implicits._
 import dspjunctions._
 import dspblocks._
@@ -42,13 +42,13 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   val io = IO(new FFTIO[T])
 
   // synchronize
-  val sync = CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
-  io.out.sync := ShiftRegisterWithReset(io.in.sync, config.direct_pipe, 0.U, io.in.valid)
+  val sync = CounterWithReset(true.B, config.bp, io.in.sync)._1
+  io.out.sync := ShiftRegisterWithReset(io.in.sync, config.direct_pipe, 0.U, io.in.valid) // should valid keep sync from propagating?
   io.out.valid := ShiftRegisterWithReset(io.in.valid, config.direct_pipe, 0.U, true.B)
 
   // wire up twiddles
-  val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genOut())))
-  twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(Real[T].fromDouble(value(0)), Real[T].fromDouble(value(1))) }
+  val pml = new RealPML(genTwiddle.getOrElse(genOut()).real)
+  val twiddle_rom = Vec(config.twiddle.map(x => DspComplex(pml.double2TFixedWidth(x(0)), pml.double2TFixedWidth(x(1)))))
   val indices_rom = Vec(config.dindices.map(x => UInt(x)))
   // TODO: make this not a multiply
   val start = sync*UInt(lanesIn-1)
@@ -61,7 +61,6 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   }
 
   // p-point decimation-in-time direct form FFT with inputs in normal order (outputs bit reversed)
-  // TODO: change type? should it all be genIn?
   val stage_outputs = List.fill(log2Up(lanesIn)+1)(List.fill(lanesIn)(Wire(genOut())))
   io.in.bits.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
 
@@ -111,16 +110,16 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   // synchronize
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
   val sync = List.fill(log2Up(config.bp)+1)(Wire(UInt(width=log2Up(config.bp))))
-  sync(0) := CounterWithReset(io.in.valid, config.bp, io.in.sync && io.in.valid)._1
-  sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegisterWithReset(prev, delay, 0.U, io.in.valid) }
+  sync(0) := CounterWithReset(true.B, config.bp, io.in.sync)._1
+  sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegisterWithReset(prev, delay, 0.U, true.B) }
   io.out.sync := sync(log2Up(config.bp)) === UInt((config.bp/2-1+config.biplex_pipe)%config.bp)
   io.out.valid := ShiftRegisterWithReset(io.in.valid, stage_delays.reduce(_+_) + config.biplex_pipe, 0.U, true.B)
 
   // wire up twiddles
-  val twiddle_rom = Wire(Vec(config.twiddle.size, genTwiddle.getOrElse(genOut())))
-  twiddle_rom.zip(config.twiddle).foreach { case(rom, value) => rom := DspComplex.wire(Real[T].fromDouble(value(0)), Real[T].fromDouble(value(1))) }
+  val pml = new RealPML(genTwiddle.getOrElse(genOut()).real)
+  val twiddle_rom = Vec(config.twiddle.map(x => DspComplex(pml.double2TFixedWidth(x(0)), pml.double2TFixedWidth(x(1)))))
   val indices_rom = Vec(config.bindices.map(x => UInt(x)))
-  val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegisterMem(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_), io.in.valid)(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
+  val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegisterMem(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_))(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
   val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genOut())))
   // special cases
   if (config.n == 4) {
@@ -145,11 +144,11 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
 
       // hook it up
       // last stage just has one extra permutation, no butterfly
-      val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegisterMem(stage_outputs(i)(start+skip), stage_delays(i), io.in.valid)), ShiftRegisterMem(sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).reduceRight(_+_)}, io.in.valid))
+      val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegisterMem(stage_outputs(i)(start+skip), stage_delays(i))), ShiftRegisterMem(sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).reduceRight(_+_)}))
       if (i == log2Up(config.bp)) {
-        Seq(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Seq(ShiftRegisterMem(mux_out(0), stage_delays(i), io.in.valid), mux_out(1))).foreach { x => x._1 := x._2 }
+        Seq(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Seq(ShiftRegisterMem(mux_out(0), stage_delays(i)), mux_out(1))).foreach { x => x._1 := x._2 }
       } else {
-        Seq(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(Seq(ShiftRegisterMem(mux_out(0), stage_delays(i), io.in.valid), mux_out(1)), twiddle(i))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i), io.in.valid) }
+        Seq(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(Seq(ShiftRegisterMem(mux_out(0), stage_delays(i)), mux_out(1)), twiddle(i))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i)) }
       }
 
     }

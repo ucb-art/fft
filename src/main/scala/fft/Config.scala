@@ -6,6 +6,7 @@ import breeze.linalg._
 import chisel3._
 import chisel3.experimental._
 import chisel3.util._
+import chisel3.internal.firrtl.KnownBinaryPoint
 import chisel3.iotesters._
 import firrtl_interpreter.InterpreterOptions
 import dsptools.numbers.{DspReal, SIntOrder, SIntRing}
@@ -55,7 +56,6 @@ object FFTConfigBuilder {
         )
 
         // add fractional bits if it's fixed point
-        // TODO: check if it's fixed point or not
         genIn() match {
           case fp: FixedPoint =>
             val fractionalBits = fp.binaryPoint
@@ -81,8 +81,7 @@ object FFTConfigBuilder {
       case _ => throw new CDEMatchError
     }) ++
   ConfigBuilder.dspBlockParams(id, fftConfig.lanes, () => DspComplex(genIn(), genIn()), genOutFunc = Some(() => DspComplex(genOut.getOrElse(genIn)(), genOut.getOrElse(genIn)())))
-  def standalone[T <: Data : Real](
-    id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config =
+  def standalone[T <: Data : Real](id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config =
     apply(id, fftConfig, genIn, genOut) ++
     ConfigBuilder.buildDSP(id, {implicit p: Parameters => new LazyFFTBlock[T]})
 }
@@ -98,11 +97,14 @@ case class FFTKey(id: String) extends Field[FFTConfig]
 // but only 2 whole bits, the rest fractional
 trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
   def genTwiddle: Option[T] = {
-    genOut() match {
-      case fp: FixedPoint =>
-        val totalBits = fp.getWidth
-        val t = FixedPoint(totalBits.W, (totalBits-2).BP)
-        Some(DspComplex(t, t).asInstanceOf[T])
+    genOut().asInstanceOf[DspComplex[T]].underlyingType() match {
+      case "fixed" =>
+        genOut().asInstanceOf[DspComplex[T]].real.asInstanceOf[FixedPoint].binaryPoint match {
+          case KnownBinaryPoint(binaryPoint) =>
+            val totalBits = genOut().asInstanceOf[DspComplex[T]].real.getWidth
+            Some(DspComplex(FixedPoint(totalBits.W, (totalBits-2).BP), FixedPoint(totalBits.W, (totalBits-2).BP)).asInstanceOf[T])
+          case _ => None
+        }
       case _ => None
     }
   }
