@@ -142,9 +142,11 @@ object spectrumTester {
     val fftSize = config.n
 
     // bin-by-bin testing
-    (0 until fftSize).foreach{ bin =>
+    val m = 16 // at most 16 bins
+    (0 until min(fftSize, m)).foreach{ bin =>
+      val b = if (fftSize > m) round(fftSize/m*bin) else bin
       val tester = setupTester(c) 
-      val tone = getTone(fftSize, bin.toDouble/fftSize)
+      val tone = getTone(fftSize, b.toDouble/fftSize)
       val testResult = testSignal(tester, tone)
       val expectedResult = fourierTr(DenseVector(tone.toArray)).toArray
       if (verbose) {
