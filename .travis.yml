@@ -1,3 +1,5 @@
+git:
+  submodules: false
 language: scala
 sudo: false
 
@@ -19,7 +21,8 @@ env:
 
 script:
   - git submodule update --init
-  - cd dsp-framework; echo "Publishing the framework, this may take a while..."; ./update.bash; cd ..; make libs; echo "Done updating!"
+  - export ROCKETCHIP_ADDONS=
+  - cd dsp-framework; ./update.bash no_hwacha; cd ..; make libs
   - make verilog
   - make travis
 
