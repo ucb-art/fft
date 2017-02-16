@@ -212,7 +212,7 @@ class FFTSpec extends FlatSpec with Matchers {
     val tests = Seq(
       // (FFT points, lanes, total width, fractional bits, pipeline depth)
       Seq(8,   8,  35, 19, 0),
-      Seq(128, 16, 21, 12, 21)
+      Seq(128, 16, 27, 16, 21)
     )
 
     for (test <- tests) {
