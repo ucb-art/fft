@@ -21,7 +21,7 @@ import chisel3.iotesters.{PeekPokeTester, TesterOptionsManager}
 
 import dsptools.numbers.{DspComplex, Real}
 import scala.util.Random
-import scala.math.{pow, abs}
+import scala.math.{pow, abs, round}
 import org.scalatest.Tag
 import dspjunctions._
 import dspblocks._
@@ -212,7 +212,7 @@ class FFTSpec extends FlatSpec with Matchers {
     val tests = Seq(
       // (FFT points, lanes, total width, fractional bits, pipeline depth)
       Seq(8,   8,  35, 19, 0),
-      Seq(128, 16, 16, 5, 21)
+      Seq(128, 16, 20, 12, 21)
     )
 
     for (test <- tests) {
