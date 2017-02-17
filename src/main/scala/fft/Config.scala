@@ -80,10 +80,10 @@ object FFTConfigBuilder {
       }
       case _ => throw new CDEMatchError
     }) ++
-  ConfigBuilder.dspBlockParams(id, fftConfig.lanes, () => DspComplex(genIn(), genIn()), genOutFunc = Some(() => DspComplex(genOut.getOrElse(genIn)(), genOut.getOrElse(genIn)())))
+  ConfigBuilder.genParams(id, fftConfig.lanes, () => DspComplex(genIn(), genIn()), genOutFunc = Some(() => DspComplex(genOut.getOrElse(genIn)(), genOut.getOrElse(genIn)())))
   def standalone[T <: Data : Real](id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config =
     apply(id, fftConfig, genIn, genOut) ++
-    ConfigBuilder.buildDSP(id, {implicit p: Parameters => new LazyFFTBlock[T]})
+    ConfigBuilder.buildDSP(id, {implicit p: Parameters => new FFTBlock[T]})
 }
 
 class DefaultStandaloneRealFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => DspReal()))

@@ -9,18 +9,16 @@ import dsptools.numbers._
 import dspjunctions._
 import dspblocks._
 
-class LazyFFTBlock[T <: Data : Real]()(implicit p: Parameters) extends LazyDspBlock()(p) {
+class FFTBlock[T <: Data : Real]()(implicit p: Parameters) extends DspBlock()(p) {
   def controls = Seq()
   def statuses = Seq()
 
-  lazy val module = new FFTBlock[T](this)
+  lazy val module = new FFTBlockModule[T](this)
 
 }
 
-class FFTBlock[T <: Data : Real](outer: LazyDspBlock)(implicit p: Parameters)
-  extends GenDspBlock[T, T](outer)(p) {
-  val baseAddr = BigInt(0)
-
+class FFTBlockModule[T <: Data : Real](outer: DspBlock)(implicit p: Parameters)
+  extends GenDspBlockModule[T, T](outer)(p) {
   val module = Module(new FFT[T])
   
   module.io.in <> unpackInput(lanesIn, genIn())
