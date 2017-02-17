@@ -81,11 +81,11 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
       val start = ((j % skip) + floor(j/skip) * skip*2).toInt
 
       // hook it up
-      val outputs = List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip))
+      val outputs           = List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip))
       val shr_delay         = config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(lanesIn)-i).foldLeft(0)(_+_)
       val shr               = ShiftRegisterMem[DspComplex[T]](twiddle(indices(j)(i)), shr_delay, io.in.valid)
       val butterfly_outputs = Butterfly[T](Seq(stage_outputs(i)(start), stage_outputs(i)(start+skip)), shr)
-      outputs.zip(butterfly_outputs) .foreach { x =>
+      outputs.zip(butterfly_outputs).foreach { x =>
         x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), io.in.valid)
       }
 
