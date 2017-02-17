@@ -4,6 +4,8 @@ Pipelined FFT [![Build Status](https://travis-ci.org/ucb-art/fft.svg?branch=mast
 # Overview
 
 This project contains a streaming, pipelined Fast Fourier Transform (FFT).
+Twiddle factors are hard-coded for you.
+The transform is split into pipelined Biplex FFTs and a direct form FFT to multiplex the logic for large FFT sizes.
 
 # Usage
 
@@ -11,33 +13,53 @@ This project contains a streaming, pipelined Fast Fourier Transform (FFT).
 
 See [here](https://ucb-art.github.io/fft/latest/api/) for the GitHub pages scaladoc.
 
+## Setup
+
+Clone the repository and update the depenedencies:
+
+```
+git clone git@github.com:ucb-art/pfb.git
+git submodule update --init
+cd dsp-framework
+./update.bash
+cd ..
+```
+
+See the [https://github.com/ucb-art/dsp-framework/blob/master/README.md](dsp-framework README) for more details on this infrastructure.
+Build the dependencies by typing `make libs`.
+
 ## Building
 
-Build the dependencies by typing `make libs`.
-To build the Verilog and IP-Xact output, type `make verilog`.
+The build flow generates FIRRTL, then generates Verilog, then runs the TSMC memory compiler to generate memories.
+Memories are black boxes in the Verilog by default.
+IP-Xact is created with the FIRRTL.
+The build targets for each of these are firrtl, verilog, and mems, respectively.
+Depedencies are handled automatically, so to build the Verilog and memories, just type `make mems`.
 Results are placed in a `generated-src` directory.
 
 ## Testing
 
 To test the block, type `make test`.
 This runs the block tester in the `src/test/scala` directory.
-It currently just tests the DC bin until unscrambling and futher testing capabilities are added.
 
 ## Configuring
 
 In `src/main/scala` there is a `Config.scala` file.
-In the `DspConfig` class are a bunch of parameters, like `FFTSize` and `FractionalBits`.
-Set these to your desired values, then rebuild and retest the design.
+A few default configurations are defined for you, called DefaultStandaloneXFFTConfig, where X is either Real or FixedPoint.
+These generate a small FFT with default parameters.
+To run them, type `make verilog CONFIG=DefaultStandaloneXFFTConfig`, replacing X with Real or FixedPoint.
+The default make target is the default FixedPoint configuration.
 
-TODO: changing between FixedPoint and DspReal
-
+The suggested way to create a custom configuration is to modify CustomStandaloneFFTConfig, which defines values for all possible parameters.
+Then run `make verilog CONFIG=CustomStandaloneFFTConfig` to generate the Verilog.
+Choosing lanes = FFT size (n) (both default to 8) only creates a direct form FFT.
 
 # Specifications
 
 ## Interfaces
 
-The FFT uses the DSP streaming interface (a subset of AXI4-Stream) on both the data input and data output.
-There are nominally no status or control registers, but the SCR File requires at least one, so a status register mirrors the sync output.
+The PFB uses the [https://github.com/ucb-art/rocket-dsp-utils/blob/master/doc/stream.md](DSP streaming interface) (a subset of AXI4-Stream) on both the data input and data output.
+There are nominally no status or control registers, so no SCR file exists.
 
 ## Signaling
 
@@ -46,9 +68,29 @@ There are nominally no status or control registers, but the SCR File requires at
 It is expected that the bits inputs contain time-series data time-multiplexed on the inputs, such that on the first cycle are values x[0], x[1], …, x[p-1], then the next cycle contains x[p], x[p+1], … and this continues until the input is x[n-p], x[n-p+1], …, x[n-1]. 
 The outputs are scrambled spectral bins. 
 Since there is some unscrambling between the biplex and direct form FFT, the output indices are not purely bit reversed. 
-The 0th output on each cycle increments by one every cycle, while the other outputs are bit reversed values of the 0th value plus the output number. 
-For example, if n = 16 and p = 4, the outputs are time-multiplexed across n/p = 4 cycles. 
-Thus the outputs are X[0], X[8], X[4], X[12] on cycle 0, X[1], X[9], X[5], X[13] on cycle 1, X[2], X[10], X[6], X[14] on cycle 2, and X[3], X[11], X[7], X[15] on cycle 3.
+The unscrambling routine is hard to describe in words, but the FFT tester has a definition to handle this, copied here.
+The FFT size is inferred from the length of `in`, and `p` gives the number of lanes in the design.
+
+```
+def unscramble(in: Seq[Complex], p: Int): Seq[Complex] = {
+  val n = in.size
+  val bp = n/p
+  val res = Array.fill(n)(Complex(0.0,0.0))
+  in.grouped(p).zipWithIndex.foreach { case (set, sindex) =>
+    set.zipWithIndex.foreach { case (bin, bindex) =>
+      if (bp > 1) {
+        val p1 = if (sindex/(bp/2) >= 1) 1 else 0
+        val new_index = bit_reverse((sindex % (bp/2)) * 2 + p1, log2Up(bp)) + bit_reverse(bindex, log2Up(n))
+        res(new_index) = bin
+      } else {
+        val new_index = bit_reverse(bindex, log2Up(n))
+        res(new_index) = bin
+      }
+    }
+  }
+  res
+}
+```
 
 ### Valid
 

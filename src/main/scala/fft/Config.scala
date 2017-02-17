@@ -36,8 +36,8 @@ object FFTConfigBuilder {
   def apply[T <: Data : Real](
     id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config = new Config(
     (pname, site, here) => pname match {
-      case FFTKey(id) => fftConfig
-      case IPXACTParameters(id) => {
+      case FFTKey(_id) if _id == id => fftConfig
+      case IPXACTParameters(_id) if _id == id => {
         val parameterMap = Map[String, String]()
 
         // Conjure up some IPXACT synthsized parameters.
@@ -86,8 +86,19 @@ object FFTConfigBuilder {
     ConfigBuilder.buildDSP(id, {implicit p: Parameters => new LazyFFTBlock[T]})
 }
 
-class DefaultStandaloneRealFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(n=128), () => DspReal()))
-class DefaultStandaloneFixedPointFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(n=128), () => FixedPoint(16.W, 8.BP), Some(() => FixedPoint(20.W, 8.BP))))
+class DefaultStandaloneRealFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => DspReal()))
+class DefaultStandaloneFixedPointFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => FixedPoint(16.W, 8.BP)))
+
+class CustomStandaloneFFTConfig extends Config(FFTConfigBuilder.standalone(
+  "fft", 
+  FFTConfig(
+    n = 2048,
+    lanes = 16,
+    pipelineDepth = 4
+  ), 
+  () => FixedPoint(32.W, 16.BP), 
+  Some(() => FixedPoint(40.W, 16.BP))
+))
 
 case class FFTKey(id: String) extends Field[FFTConfig]
 
