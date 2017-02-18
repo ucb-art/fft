@@ -92,12 +92,12 @@ class DefaultStandaloneFixedPointFFTConfig extends Config(FFTConfigBuilder.stand
 class CustomStandaloneFFTConfig extends Config(FFTConfigBuilder.standalone(
   "fft", 
   FFTConfig(
-    n = 2048,
+    n = 128,
     lanes = 16,
     pipelineDepth = 4
   ), 
-  () => FixedPoint(32.W, 16.BP), 
-  Some(() => FixedPoint(40.W, 16.BP))
+  () => FixedPoint(17.W, 14.BP), 
+  Some(() => FixedPoint(20.W, 12.BP))
 ))
 
 case class FFTKey(id: String) extends Field[FFTConfig]
