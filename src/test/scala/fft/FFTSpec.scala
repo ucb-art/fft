@@ -75,7 +75,7 @@ object spectrumTester {
     for (i <- 0 until test_length) {
       // repeat end of signal
       groupedSignal(min(i, groupedSignal.size-1)).zip(io.in.bits).foreach { case(sig, port) => dut.dspPoke(port, sig) }
-      if (!synced && dut.peek(io.out.sync) == 1 && config.bp != 1) { synced = true }
+      if (!synced && dut.peek(io.out.sync) == 1 && config.bp != 1) { synced = true; println(s"synced on cycle $i") }
       else if (synced || config.bp == 1) { io.out.bits.foreach(x => retval += dut.dspPeek(x).right.get) }
       dut.step(1)
     }
@@ -117,9 +117,13 @@ object spectrumTester {
     res
   }
 
-  def setupTester[T <: Data](c: () => FFT[T]): FFTTester[T] = {
+  def setupTester[T <: Data](c: () => FFT[T], verbose: Boolean = false): FFTTester[T] = {
     var tester: FFTTester[T] = null
-    chisel3.iotesters.Driver.execute(Array("-fimed", "2000"), c) (c => {
+    val manager = new TesterOptionsManager {
+      testerOptions = TesterOptions(backendName = "firrtl", testerSeed = 7L)
+      interpreterOptions = InterpreterOptions(setVerbose = false, writeVCD = verbose, maxExecutionDepth = 2000)
+    }
+    chisel3.iotesters.Driver.execute(c, manager) (c => {
       val t = new FFTTester(c)
       tester = t
       t
@@ -145,7 +149,7 @@ object spectrumTester {
     val m = 16 // at most 16 bins
     (0 until min(fftSize, m)).foreach{ bin =>
       val b = if (fftSize > m) round(fftSize/m*bin) else bin
-      val tester = setupTester(c) 
+      val tester = setupTester(c, verbose) 
       val tone = getTone(fftSize, b.toDouble/fftSize)
       val testResult = testSignal(tester, tone)
       val expectedResult = fourierTr(DenseVector(tone.toArray)).toArray
@@ -163,7 +167,7 @@ object spectrumTester {
 
     // random testing
     (0 until 4).foreach{ x =>
-      val tester = setupTester(c) 
+      val tester = setupTester(c, verbose) 
       val tone = (0 until fftSize).map(x => Complex(Random.nextDouble(), Random.nextDouble()))
       val testResult = testSignal(tester, tone)
       val expectedResult = fourierTr(DenseVector(tone.toArray)).toArray
@@ -195,15 +199,6 @@ object spectrumTester {
   }
 }
 
-/*
-DSPTop1 is for 8-point FFT, 8 lanes and 16 total bit width and 14 fractional bits
-DSPTop2 is for 32-point FFT, 8 lanes and 16 total bit width and 14 fractional bits
-DSPTop3 is for 128-point FFT, 16 lanes and 16 total bit width and 14 fractional bits
-DSPTop4 is for 8-point FFT, 8 lanes and 18 total bit width and 13 fractional bits
-DSPTop5 is for 32-point FFT, 8 lanes and 19 total bit width and 12 fractional bits
-DSPTop6 is for 128-point FFT, 16 lanes and 20 total bit width and 11 fractional bits
-*/
-
 class FFTSpec extends FlatSpec with Matchers {
   behavior of "FFT"
 
@@ -231,7 +226,7 @@ class FFTSpec extends FlatSpec with Matchers {
         ).toInstance
       )
       println(s"Testing ${test(0)}-point FFT with ${test(1)} lanes, ${test(2)} total bits, ${test(3)} fractional bits, and ${test(4)} pipeline depth")
-      spectrumTester(() => new FFT, p(FFTKey(p(DspBlockId))))
+      spectrumTester(() => new FFT, p(FFTKey(p(DspBlockId))), false)
     }
   }
 

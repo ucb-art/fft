@@ -37,7 +37,7 @@ object FFTConfigBuilder {
     id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config = new Config(
     (pname, site, here) => pname match {
       case FFTKey(_id) if _id == id => fftConfig
-      case IPXACTParameters(_id) if _id == id => {
+      case IPXactParameters(_id) if _id == id => {
         val parameterMap = Map[String, String]()
 
         // Conjure up some IPXACT synthsized parameters.
@@ -80,10 +80,10 @@ object FFTConfigBuilder {
       }
       case _ => throw new CDEMatchError
     }) ++
-  ConfigBuilder.dspBlockParams(id, fftConfig.lanes, () => DspComplex(genIn(), genIn()), genOutFunc = Some(() => DspComplex(genOut.getOrElse(genIn)(), genOut.getOrElse(genIn)())))
+  ConfigBuilder.genParams(id, fftConfig.lanes, () => DspComplex(genIn(), genIn()), genOutFunc = Some(() => DspComplex(genOut.getOrElse(genIn)(), genOut.getOrElse(genIn)())))
   def standalone[T <: Data : Real](id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config =
     apply(id, fftConfig, genIn, genOut) ++
-    ConfigBuilder.buildDSP(id, {implicit p: Parameters => new LazyFFTBlock[T]})
+    ConfigBuilder.buildDSP(id, {implicit p: Parameters => new FFTBlock[T]})
 }
 
 class DefaultStandaloneRealFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => DspReal()))
@@ -92,12 +92,12 @@ class DefaultStandaloneFixedPointFFTConfig extends Config(FFTConfigBuilder.stand
 class CustomStandaloneFFTConfig extends Config(FFTConfigBuilder.standalone(
   "fft", 
   FFTConfig(
-    n = 2048,
+    n = 128,
     lanes = 16,
     pipelineDepth = 4
   ), 
-  () => FixedPoint(32.W, 16.BP), 
-  Some(() => FixedPoint(40.W, 16.BP))
+  () => FixedPoint(17.W, 14.BP), 
+  Some(() => FixedPoint(20.W, 12.BP))
 ))
 
 case class FFTKey(id: String) extends Field[FFTConfig]
