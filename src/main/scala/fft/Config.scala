@@ -37,7 +37,7 @@ object FFTConfigBuilder {
     id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config = new Config(
     (pname, site, here) => pname match {
       case FFTKey(_id) if _id == id => fftConfig
-      case IPXACTParameters(_id) if _id == id => {
+      case IPXactParameters(_id) if _id == id => {
         val parameterMap = Map[String, String]()
 
         // Conjure up some IPXACT synthsized parameters.

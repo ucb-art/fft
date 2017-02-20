@@ -180,7 +180,7 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   when (io.in.valid) {
     in.bits := io.in.bits
   } .otherwise {
-    in.bits := Wire(Vec(lanesIn, DspComplex.wire(Real[T].zero, Real[T].zero)))
+    in.bits := Vec.fill(lanesIn)(DspComplex(Real[T].zero, Real[T].zero))
   }
   in.valid := io.in.valid
   in.sync := io.in.sync
