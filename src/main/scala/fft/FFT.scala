@@ -57,7 +57,12 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   if (config.n == 4) {
     twiddle := Vec((0 until lanesIn-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(0)), twiddle_rom(0))))
   } else {
-    twiddle := Vec((0 until lanesIn-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4)-1, 0))), twiddle_rom(indices_rom(start+UInt(x))))))
+    twiddle := Vec((0 until lanesIn-1).map { case x => 
+      val index = indices_rom(start+UInt(x))
+      Mux(index(log2Ceil(config.n/4)), 
+        DspComplex.divideByJ(twiddle_rom(index(log2Ceil(config.n/4)-1, 0))), 
+        twiddle_rom(index))
+    })
   }
 
   // p-point decimation-in-time direct form FFT with inputs in normal order (outputs bit reversed)
@@ -127,7 +132,12 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   } else if (config.bp == 2) {
     twiddle := Vec((0 until log2Up(config.bp)).map(x => twiddle_rom(indices(x))))
   } else {
-    twiddle := Vec((0 until log2Up(config.bp)).map(x => Mux(indices(x)(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(indices(x)(log2Ceil(config.n/4)-1, 0))), twiddle_rom(indices(x)))))
+    twiddle := Vec((0 until log2Up(config.bp)).map { case x => 
+      val index = indices(x)
+      Mux(index(log2Ceil(config.n/4)), 
+        DspComplex.divideByJ(twiddle_rom(index(log2Ceil(config.n/4)-1, 0))), 
+        twiddle_rom(index))
+    })
   }
 
   // bp-point decimation-in-time biplex pipelined FFT with outputs in bit-reversed order
