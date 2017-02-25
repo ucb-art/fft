@@ -12,7 +12,6 @@ import dsptools.numbers._
 import dsptools.numbers.implicits._
 import dspjunctions._
 import dspblocks._
-import dsptools.counters._
 import scala.math._
 import rocketchip.PeripheryUtils
 import junctions._
@@ -42,7 +41,8 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   val io = IO(new FFTIO[T])
 
   // synchronize
-  val sync = CounterWithReset(true.B, config.bp, io.in.sync)._1
+  val valid_delay = Reg(next=io.in.valid)
+  val sync = CounterWithReset(true.B, config.bp, io.in.sync, ~valid_delay & io.in.valid)._1
   io.out.sync := ShiftRegisterWithReset(io.in.sync, config.direct_pipe, 0.U, io.in.valid) // should valid keep sync from propagating?
   io.out.valid := ShiftRegisterWithReset(io.in.valid, config.direct_pipe, 0.U, true.B)
 
@@ -115,7 +115,8 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   // synchronize
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
   val sync = List.fill(log2Up(config.bp)+1)(Wire(UInt(width=log2Up(config.bp))))
-  sync(0) := CounterWithReset(true.B, config.bp, io.in.sync)._1
+  val valid_delay = Reg(next=io.in.valid)
+  sync(0) := CounterWithReset(true.B, config.bp, io.in.sync, ~valid_delay & io.in.valid)._1
   sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegisterWithReset(prev, delay, 0.U, true.B) }
   io.out.sync := sync(log2Up(config.bp)) === UInt((config.bp/2-1+config.biplex_pipe)%config.bp)
   io.out.valid := ShiftRegisterWithReset(io.in.valid, stage_delays.reduce(_+_) + config.biplex_pipe, 0.U, true.B)

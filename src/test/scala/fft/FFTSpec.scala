@@ -137,6 +137,8 @@ object spectrumTester {
   }
 
   def getTone(numSamples: Int, f: Double): Seq[Complex] = {
+    // uncomment to scale input tone 
+    //(0 until numSamples).map(i => pow(2, -(numSamples+1))*Complex(math.cos(2 * math.Pi * f * i), math.sin(2 * math.Pi * f * i)))
     (0 until numSamples).map(i => Complex(math.cos(2 * math.Pi * f * i), math.sin(2 * math.Pi * f * i)))
   }
 
@@ -229,6 +231,5 @@ class FFTSpec extends FlatSpec with Matchers {
       spectrumTester(() => new FFT, p(FFTKey(p(DspBlockId))), false)
     }
   }
-
 }
 

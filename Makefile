@@ -27,7 +27,7 @@ $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir: $(all_stamps) $(call lookup_scal
 	cd $(base_dir) && $(SBT) "run-main $(PROJECT).DspGenerator $(CHISEL_ARGS) $(build_dir) $(PROJECT) $(MODEL) $(CFG_PROJECT) $(CONFIG)"
 
 $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).v: $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir
-	$(FIRRTL) -i $< -o $@ -X verilog -firw $(MODEL) -frsq -c:$(MODEL):-o:$(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).conf
+	$(FIRRTL) -i $< -o $@ -X verilog -frsq -c:$(MODEL):-o:$(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).conf -firw $(MODEL) 
 
 $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).mems.v: $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).v
 	cd $(build_dir) && $(MEM_GEN) -conf $(PROJECT).$(MODEL).$(CONFIG).conf -v $(PROJECT).$(MODEL).$(CONFIG).mems.v -report $(PROJECT).$(MODEL).$(CONFIG).mems.rpt
