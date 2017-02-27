@@ -36,7 +36,7 @@ import dsptools._
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
-class FFTTester[T<:Data](val c: FFT[T]) extends DspTester(c) {
+class FFTTester[T<:Data](val c: FFT[T]) extends DspTester(c) with HasDspPokeAs[FFT[T]] {
   poke(c.io.in.valid, 1)
   // this is a hack to use FFTTester outside of the normal driver methods
   override def finish = true
