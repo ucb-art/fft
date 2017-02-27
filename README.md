@@ -18,7 +18,7 @@ See [here](https://ucb-art.github.io/fft/latest/api/) for the GitHub pages scala
 Clone the repository and update the depenedencies:
 
 ```
-git clone git@github.com:ucb-art/pfb.git
+git clone git@github.com:ucb-art/fft.git
 git submodule update --init
 cd dsp-framework
 ./update.bash

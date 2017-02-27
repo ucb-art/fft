@@ -44,8 +44,8 @@ object FFTConfigBuilder {
         val gk = site(GenKey(id))
         val fftsize = fftConfig.n
         // double these because genIn is underlying type, but input is complex
-        val totalWidthIn = gk.lanesIn * genIn().getWidth * 2 
-        val totalWidthOut = gk.lanesOut * genOut.getOrElse(genIn)().getWidth * 2
+        val totalWidthIn = genIn().getWidth 
+        val totalWidthOut = genOut.getOrElse(genIn)().getWidth
         parameterMap ++= List(
           ("nBands", (fftsize/gk.lanesIn).toString),
           ("InputLanes", gk.lanesIn.toString),
@@ -90,14 +90,14 @@ class DefaultStandaloneRealFFTConfig extends Config(FFTConfigBuilder.standalone(
 class DefaultStandaloneFixedPointFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => FixedPoint(16.W, 8.BP)))
 
 class CustomStandaloneFFTConfig extends Config(FFTConfigBuilder.standalone(
-  "fft", 
-  FFTConfig(
+  id = "fft", 
+  fftConfig = FFTConfig(
     n = 128,
     lanes = 16,
     pipelineDepth = 4
   ), 
-  () => FixedPoint(17.W, 14.BP), 
-  Some(() => FixedPoint(20.W, 12.BP))
+  genIn = () => FixedPoint(17.W, 14.BP), 
+  genOut = Some(() => FixedPoint(20.W, 12.BP))
 ))
 
 case class FFTKey(id: String) extends Field[FFTConfig]
