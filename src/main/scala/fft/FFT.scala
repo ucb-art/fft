@@ -65,8 +65,6 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
     val twiddle = Wire(DspComplex(genTwiddleReal, genTwiddleImag))
     twiddle.real := real
     twiddle.imag := imag
-    // val a = DspComplex.protoWithFixedWidth(breeze.math.Complex(x(0), x(1)), genTwiddle.getOrElse(genOut()).real)
-    println(s"Wire(${x(0)}, ${x(1)}) has widths (${twiddle.real.getWidth}, ${twiddle.imag.getWidth})")
     twiddle
   }))
   val indices_rom = Vec(config.dindices.map(x => UInt(x)))
