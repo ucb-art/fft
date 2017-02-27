@@ -37,7 +37,6 @@ import dsptools._
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
 class FFTTester[T<:Data](val c: FFT[T]) extends DspTester(c) with HasDspPokeAs[FFT[T]] {
-  poke(c.io.in.valid, 1)
   // this is a hack to use FFTTester outside of the normal driver methods
   override def finish = true
   def actualFinish = super.finish
@@ -59,9 +58,12 @@ object spectrumTester {
     if (signal.size > config.n) { println("Warning: test signal longer than the FFT size, will only use first n points") }
 
     // synchronize to the next input
-    dut.poke(io.in.sync, 1)
-    dut.step(1)
+    //dut.poke(io.in.sync, 1)
+    //dut.step(1)
     dut.poke(io.in.sync, 0)
+    dut.poke(io.in.valid, 0)
+    dut.step(1)
+    dut.poke(io.in.valid, 1)
 
     // get delay
     val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
@@ -70,17 +72,23 @@ object spectrumTester {
     // create return val
     val retval = new scala.collection.mutable.Queue[Complex]()
     var synced = false
+    var last_valid = false
 
     // poke input signal
     for (i <- 0 until test_length) {
       // repeat end of signal
       groupedSignal(min(i, groupedSignal.size-1)).zip(io.in.bits).foreach { case(sig, port) => dut.dspPoke(port, sig) }
-      if (!synced && dut.peek(io.out.sync) == 1 && config.bp != 1) { synced = true; println(s"synced on cycle $i") }
-      else if (synced || config.bp == 1) { io.out.bits.foreach(x => retval += dut.dspPeek(x).right.get) }
+      val valid = dut.peek(io.out.valid)
+      if (!synced && (valid & !last_valid)) { synced = true; println(s"synced on cycle $i") }
+      if (synced || config.bp == 1) { io.out.bits.foreach(x => retval += dut.dspPeek(x).right.get) }
+      if (!synced && dut.peek(io.out.sync) && config.bp != 1) { synced = true; println(s"synced on cycle $i") }
+      last_valid = valid
       dut.step(1)
     }
 
     // return unscrambled output
+    require(!retval.isEmpty, "Output queue is empty")
+    require(retval.size == config.n, s"Output queue has the wrong number of values, got ${retval.size}, expected ${config.n}")
     unscramble(retval.toSeq, config.lanes)
   }
 
@@ -209,7 +217,7 @@ class FFTSpec extends FlatSpec with Matchers {
     val tests = Seq(
       // (FFT points, lanes, total width, fractional bits, pipeline depth)
       Seq(8,   8,  35, 19, 0),
-      Seq(128, 16, 27, 16, 21)
+      Seq(128, 16, 27, 16, 17)
     )
 
     for (test <- tests) {
