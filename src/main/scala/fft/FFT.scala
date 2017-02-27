@@ -47,7 +47,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
   // synchronize
   val valid_delay = Reg(next=io.in.valid)
   val sync = CounterWithReset(true.B, config.bp, io.in.sync, ~valid_delay & io.in.valid)._1
-  io.out.sync := ShiftRegisterWithReset(io.in.sync, config.direct_pipe, 0.U, io.in.valid) // should valid keep sync from propagating?
+  io.out.sync := ShiftRegisterWithReset(io.in.valid && io.in.sync, config.direct_pipe, 0.U, true.B) // should valid keep sync from propagating?
   io.out.valid := ShiftRegisterWithReset(io.in.valid, config.direct_pipe, 0.U, true.B)
 
   // wire up twiddles
