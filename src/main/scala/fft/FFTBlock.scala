@@ -24,5 +24,5 @@ class FFTBlockModule[T <: Data : Real](outer: DspBlock)(implicit p: Parameters)
   module.io.in <> unpackInput(lanesIn, genIn())
   unpackOutput(lanesOut, genOut()) <> module.io.out
 
-  IPXactComponents._ipxactComponents += DspIPXact.makeDspBlockComponent
+  IPXactComponents._ipxactComponents += DspIPXact.makeDspBlockComponent(baseAddr)
 }

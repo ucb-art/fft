@@ -51,7 +51,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
   val genTwiddleReal = genTwiddle.getOrElse(genOut()).real
   val genTwiddleImag = genTwiddle.getOrElse(genOut()).imag
   // This should work and would simplify the firrtl, but... it doesn't seem to work
-  //val twiddle_rom = Vec(config.twiddle.map(x => 
+  //val twiddle_rom = Vec(config.twiddle.map(x =>
   //  DspComplex(genTwiddleReal.fromDoubleWithFixedWidth(x(0)), genTwiddleImag.fromDoubleWithFixedWidth(x(1)))
   //))
   val twiddle_rom = Vec(config.twiddle.map( x => {
@@ -74,7 +74,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
   if (config.n == 4) {
     twiddle := Vec((0 until lanesIn-1).map(x => {
       val true_branch  = Wire(genTwiddle.getOrElse(genOut()))
-      true_branch     := twiddle_rom(0).divj
+      true_branch     := twiddle_rom(0).divj()
       val false_branch = Wire(genTwiddle.getOrElse(genOut()))
       false_branch    := twiddle_rom(0)
       Mux(
@@ -91,7 +91,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
       false_branch    := twiddle_rom(indices_rom(start+UInt(x)))
 
       val index = indices_rom(start+UInt(x))
-      Mux(index(log2Ceil(config.n/4)), 
+      Mux(index(log2Ceil(config.n/4)),
           true_branch,
           false_branch
       )
@@ -176,7 +176,7 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
     twiddle := Vec((0 until log2Up(config.bp)).map(x => {
       val true_branch  = Wire(genTwiddle.getOrElse(genOut()))
       val false_branch = Wire(genTwiddle.getOrElse(genOut()))
-      true_branch     := twiddle_rom(0).divj
+      true_branch     := twiddle_rom(0).divj()
       false_branch    := twiddle_rom(0)
       Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
     }))
@@ -225,7 +225,7 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
 
 /**
   * fast fourier transform - cooley-tukey algorithm, decimation-in-time
-  * mixed version 
+  * mixed version
   * note, this is always an n-point FFT
   * @tparam T
   */
@@ -248,7 +248,7 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   }
   in.valid := io.in.valid
   in.sync := io.in.sync
-  
+
   val direct = Module(new DirectFFT[T])
   io.out <> direct.io.out
 
