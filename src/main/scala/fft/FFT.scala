@@ -12,7 +12,6 @@ import dsptools.numbers._
 import dsptools.numbers.implicits._
 import dspjunctions._
 import dspblocks._
-import dsptools.counters._
 import scala.math._
 import rocketchip.PeripheryUtils
 import junctions._
@@ -28,6 +27,9 @@ class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasG
 
   val in = Input(ValidWithSync(Vec(lanesIn, genIn())))
   val out = Output(ValidWithSync(Vec(lanesOut, genOut())))
+
+  val data_set_end_status = Output(Bool())
+  val data_set_end_clear = Input(Bool())
 }
 
 /**
@@ -36,31 +38,71 @@ class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasG
   * note, this is always a p-point FFT, though the twiddle factors will be different if p < n
   * @tparam T
   */
-class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasFFTGenParameters[DspComplex[T]] {
+class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
+    with HasFFTGenParameters[DspComplex[T]] {
   val config: FFTConfig = p(FFTKey(p(DspBlockId)))
 
   val io = IO(new FFTIO[T])
 
   // synchronize
-  val sync = CounterWithReset(true.B, config.bp, io.in.sync)._1
-  io.out.sync := ShiftRegisterWithReset(io.in.sync, config.direct_pipe, 0.U, io.in.valid) // should valid keep sync from propagating?
+  val valid_delay = Reg(next=io.in.valid)
+  val sync = CounterWithReset(true.B, config.bp, io.in.sync, ~valid_delay & io.in.valid)._1
+  io.out.sync := ShiftRegisterWithReset(io.in.valid && io.in.sync, config.direct_pipe, 0.U, true.B) // should valid keep sync from propagating?
   io.out.valid := ShiftRegisterWithReset(io.in.valid, config.direct_pipe, 0.U, true.B)
 
   // wire up twiddles
-  val pml = new RealPML(genTwiddle.getOrElse(genOut()).real)
-  val twiddle_rom = Vec(config.twiddle.map(x => DspComplex(pml.double2TFixedWidth(x(0)), pml.double2TFixedWidth(x(1)))))
+  val genTwiddleReal = genTwiddle.getOrElse(genOut()).real
+  val genTwiddleImag = genTwiddle.getOrElse(genOut()).imag
+  // This should work and would simplify the firrtl, but... it doesn't seem to work
+  //val twiddle_rom = Vec(config.twiddle.map(x =>
+  //  DspComplex(genTwiddleReal.fromDoubleWithFixedWidth(x(0)), genTwiddleImag.fromDoubleWithFixedWidth(x(1)))
+  //))
+  val twiddle_rom = Vec(config.twiddle.map( x => {
+    val real = Wire(genTwiddleReal.cloneType)
+    val imag = Wire(genTwiddleImag.cloneType)
+    real := genTwiddleReal.fromDouble(x(0))
+    imag := genTwiddleImag.fromDouble(x(1))
+    val twiddle = Wire(DspComplex(genTwiddleReal, genTwiddleImag))
+    twiddle.real := real
+    twiddle.imag := imag
+    // val a = DspComplex.protoWithFixedWidth(breeze.math.Complex(x(0), x(1)), genTwiddle.getOrElse(genOut()).real)
+    println(s"Wire(${x(0)}, ${x(1)}) has widths (${twiddle.real.getWidth}, ${twiddle.imag.getWidth})")
+    twiddle
+  }))
   val indices_rom = Vec(config.dindices.map(x => UInt(x)))
   // TODO: make this not a multiply
   val start = sync*UInt(lanesIn-1)
   val twiddle = Vec.fill(lanesIn-1)(Wire(genTwiddle.getOrElse(genOut())))
   // special case when n = 4, because the pattern breaks down
   if (config.n == 4) {
-    twiddle := Vec((0 until lanesIn-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(0)), twiddle_rom(0))))
+    twiddle := Vec((0 until lanesIn-1).map(x => {
+      val true_branch  = Wire(genTwiddle.getOrElse(genOut()))
+      true_branch     := twiddle_rom(0).divj()
+      val false_branch = Wire(genTwiddle.getOrElse(genOut()))
+      false_branch    := twiddle_rom(0)
+      Mux(
+        indices_rom(start+UInt(x))(log2Ceil(config.n/4)),
+        true_branch,
+        false_branch
+      )
+    }))
   } else {
-    twiddle := Vec((0 until lanesIn-1).map(x => Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4)-1, 0))), twiddle_rom(indices_rom(start+UInt(x))))))
+    twiddle := Vec((0 until lanesIn-1).map(x => {
+      val true_branch  = Wire(genTwiddle.getOrElse(genOut()))
+      true_branch     := twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4)-1, 0)).divj()
+      val false_branch = Wire(genTwiddle.getOrElse(genOut()))
+      false_branch    := twiddle_rom(indices_rom(start+UInt(x)))
+
+      val index = indices_rom(start+UInt(x))
+      Mux(index(log2Ceil(config.n/4)),
+          true_branch,
+          false_branch
+      )
+    }))
   }
 
-  // p-point decimation-in-time direct form FFT with inputs in normal order (outputs bit reversed)
+  // p-point decimation-in-time direct form FFT with inputs in normal order
+  // (outputs bit reversed)
   val stage_outputs = List.fill(log2Up(lanesIn)+1)(List.fill(lanesIn)(Wire(genOut())))
   io.in.bits.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
 
@@ -110,24 +152,49 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   // synchronize
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
   val sync = List.fill(log2Up(config.bp)+1)(Wire(UInt(width=log2Up(config.bp))))
-  sync(0) := CounterWithReset(true.B, config.bp, io.in.sync)._1
+  val valid_delay = Reg(next=io.in.valid)
+  sync(0) := CounterWithReset(true.B, config.bp, io.in.sync, ~valid_delay & io.in.valid)._1
   sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegisterWithReset(prev, delay, 0.U, true.B) }
   io.out.sync := sync(log2Up(config.bp)) === UInt((config.bp/2-1+config.biplex_pipe)%config.bp)
   io.out.valid := ShiftRegisterWithReset(io.in.valid, stage_delays.reduce(_+_) + config.biplex_pipe, 0.U, true.B)
 
   // wire up twiddles
-  val pml = new RealPML(genTwiddle.getOrElse(genOut()).real)
-  val twiddle_rom = Vec(config.twiddle.map(x => DspComplex(pml.double2TFixedWidth(x(0)), pml.double2TFixedWidth(x(1)))))
+  val genTwiddleReal = genTwiddle.getOrElse(genOut()).real
+  val genTwiddleImag = genTwiddle.getOrElse(genOut()).imag
+  val twiddle_rom = Vec(config.twiddle.map(x => {
+    val real = Wire(genTwiddleReal.cloneType)
+    val imag = Wire(genTwiddleImag.cloneType)
+    real := genTwiddleReal.fromDouble(x(0))
+    imag := genTwiddleImag.fromDouble(x(1))
+    val twiddle = Wire(DspComplex(genTwiddleReal, genTwiddleImag))
+    twiddle.real := real
+    twiddle.imag := imag
+    twiddle
+  }))
   val indices_rom = Vec(config.bindices.map(x => UInt(x)))
   val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegisterMem(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_))(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
   val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genOut())))
   // special cases
   if (config.n == 4) {
-    twiddle := Vec((0 until log2Up(config.bp)).map(x => Mux(indices(x)(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(0)), twiddle_rom(0))))
+    twiddle := Vec((0 until log2Up(config.bp)).map(x => {
+      val true_branch  = Wire(genTwiddle.getOrElse(genOut()))
+      val false_branch = Wire(genTwiddle.getOrElse(genOut()))
+      true_branch     := twiddle_rom(0).divj()
+      false_branch    := twiddle_rom(0)
+      Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
+    }))
   } else if (config.bp == 2) {
-    twiddle := Vec((0 until log2Up(config.bp)).map(x => twiddle_rom(indices(x))))
+    twiddle := Vec((0 until log2Up(config.bp)).map(x =>
+      twiddle_rom(indices(x))
+    ))
   } else {
-    twiddle := Vec((0 until log2Up(config.bp)).map(x => Mux(indices(x)(log2Ceil(config.n/4)), DspComplex.divideByJ(twiddle_rom(indices(x)(log2Ceil(config.n/4)-1, 0))), twiddle_rom(indices(x)))))
+    twiddle := Vec((0 until log2Up(config.bp)).map(x => {
+      val true_branch  = Wire(genTwiddle.getOrElse(genOut()))
+      val false_branch = Wire(genTwiddle.getOrElse(genOut()))
+      true_branch     := twiddle_rom(indices(x)(log2Ceil(config.n/4)-1, 0)).divj()
+      false_branch    := twiddle_rom(indices(x))
+      Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
+    }))
   }
 
   // bp-point decimation-in-time biplex pipelined FFT with outputs in bit-reversed order
@@ -161,7 +228,7 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
 
 /**
   * fast fourier transform - cooley-tukey algorithm, decimation-in-time
-  * mixed version 
+  * mixed version
   * note, this is always an n-point FFT
   * @tparam T
   */
@@ -184,7 +251,18 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   }
   in.valid := io.in.valid
   in.sync := io.in.sync
-  
+
+  // data set end flag
+  val valid_delay = Reg(next=io.out.valid)
+  val dses = Reg(init=false.B)
+  when (io.data_set_end_clear) {
+    dses := false.B
+  } .elsewhen (valid_delay & ~io.out.valid) {
+    dses := true.B
+  }
+  io.data_set_end_status := dses
+
+  // instantiate sub-FFTs
   val direct = Module(new DirectFFT[T])
   io.out <> direct.io.out
 

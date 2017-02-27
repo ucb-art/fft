@@ -38,7 +38,7 @@ lazy val fft = (project in file(".")).
   configs(TravisTest).
   settings(inConfig(TravisTest)(Defaults.testTasks): _*)
 
-testOptions in TravisTest += Tests.Argument(TestFrameworks.ScalaTest, "-l", "edu.berkeley.tags.LocalTest")
+testOptions in TravisTest += Tests.Argument(TestFrameworks.ScalaTest, "-l", "edu.berkeley.tags.LocalTest", "-eF")
 
 ghpages.settings
 
