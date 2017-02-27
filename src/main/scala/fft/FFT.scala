@@ -27,6 +27,9 @@ class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasG
 
   val in = Input(ValidWithSync(Vec(lanesIn, genIn())))
   val out = Output(ValidWithSync(Vec(lanesOut, genOut())))
+
+  val data_set_end_status = Output(Bool())
+  val data_set_end_clear = Input(Bool())
 }
 
 /**
@@ -249,6 +252,17 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   in.valid := io.in.valid
   in.sync := io.in.sync
 
+  // data set end flag
+  val valid_delay = Reg(next=io.out.valid)
+  val dses = Reg(init=false.B)
+  when (io.data_set_end_clear) {
+    dses := false.B
+  } .elsewhen (valid_delay & ~io.out.valid) {
+    dses := true.B
+  }
+  io.data_set_end_status := dses
+
+  // instantiate sub-FFTs
   val direct = Module(new DirectFFT[T])
   io.out <> direct.io.out
 

@@ -15,6 +15,8 @@ class FFTBlock[T <: Data : Real]()(implicit p: Parameters) extends DspBlock()(p)
 
   lazy val module = new FFTBlockModule[T](this)
 
+  addStatus("Data_Set_End_Status")
+  addControl("Data_Set_End_Clear", 0.U)
 }
 
 class FFTBlockModule[T <: Data : Real](outer: DspBlock)(implicit p: Parameters)
@@ -23,6 +25,9 @@ class FFTBlockModule[T <: Data : Real](outer: DspBlock)(implicit p: Parameters)
   
   module.io.in <> unpackInput(lanesIn, genIn())
   unpackOutput(lanesOut, genOut()) <> module.io.out
+
+  status("Data_Set_End_Status") := module.io.data_set_end_status
+  module.io.data_set_end_clear := control("Data_Set_End_Clear")
 
   IPXactComponents._ipxactComponents += DspIPXact.makeDspBlockComponent(baseAddr)
 }
