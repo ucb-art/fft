@@ -19,22 +19,15 @@ MODEL ?= DspTop
 CFG_PROJECT ?= fft
 CONFIG ?= DefaultStandaloneFixedPointFFTConfig
 
-MEM_GEN ?= $(base_dir)/src/main/python/vlsi_mem_gen
-
-
 $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir: $(all_stamps) $(call lookup_scala_srcs,$(base_dir)/src/main/scala)
 	mkdir -p $(build_dir)
 	cd $(base_dir) && $(SBT) "run-main $(PROJECT).DspGenerator $(CHISEL_ARGS) $(build_dir) $(PROJECT) $(MODEL) $(CFG_PROJECT) $(CONFIG)"
 
 $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).v: $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir
-	$(FIRRTL) -i $< -o $@ -X verilog -frsq -c:$(MODEL):-o:$(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).conf -firw $(MODEL) 
-
-$(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).mems.v: $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).v
-	cd $(build_dir) && $(MEM_GEN) -conf $(PROJECT).$(MODEL).$(CONFIG).conf -v $(PROJECT).$(MODEL).$(CONFIG).mems.v -report $(PROJECT).$(MODEL).$(CONFIG).mems.rpt
+	$(FIRRTL) -i $< -o $@ -X verilog
 
 firrtl: $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).fir
 verilog: $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).v
-mems: $(build_dir)/$(PROJECT).$(MODEL).$(CONFIG).mems.v
 
 test: $(all_stamps)
 	$(SBT) test
