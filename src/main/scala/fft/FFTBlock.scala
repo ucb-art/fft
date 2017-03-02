@@ -17,6 +17,9 @@ class FFTBlock[T <: Data : Real]()(implicit p: Parameters) extends DspBlock()(p)
 
   addStatus("Data_Set_End_Status")
   addControl("Data_Set_End_Clear", 0.U)
+
+  addControl("Wrapback", 0.U)
+
 }
 
 class FFTBlockModule[T <: Data : Real](outer: DspBlock)(implicit p: Parameters)
