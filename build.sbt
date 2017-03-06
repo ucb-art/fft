@@ -18,10 +18,11 @@ val defaultVersions = Map(
   "dsptools" -> "1.0",
   "rocket-dsp-utils" -> "1.0",
   "chisel3" -> "3.1-SNAPSHOT",
-  "chisel-iotesters" -> "1.2-SNAPSHOT"
+  "chisel-iotesters" -> "1.2-SNAPSHOT",
+  "tapeout" -> "0.1-SNAPSHOT"
   )
 
-libraryDependencies ++= Seq("dsptools", "rocket-dsp-utils", "chisel3", "chisel-iotesters").map {
+libraryDependencies ++= Seq("dsptools", "rocket-dsp-utils", "chisel3", "chisel-iotesters", "tapeout").map {
   dep: String => "edu.berkeley.cs" %% dep % sys.props.getOrElse(dep + "Version", defaultVersions(dep)) }
 
 libraryDependencies += "org.spire-math" %% "spire" % "0.11.0"
