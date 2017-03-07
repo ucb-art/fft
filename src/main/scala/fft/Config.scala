@@ -130,7 +130,7 @@ trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
   * @param lanes Number of parallel input and output lanes
   * @param real Not currently used
   */
-case class FFTConfig(n: Int = 8, // n-point FFT
+case class FFTConfig(n: Int = 16, // n-point FFT
                      pipelineDepth: Int = 0,
                      lanes: Int = 8,
                      real: Boolean = false // real inputs?

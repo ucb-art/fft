@@ -345,3 +345,5 @@ test_run_dir/
 
 # custom
 /generated-src
+unused.clocks
+unused.confg

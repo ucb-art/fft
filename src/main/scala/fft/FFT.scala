@@ -15,6 +15,7 @@ import dspblocks._
 import scala.math._
 import rocketchip.PeripheryUtils
 import junctions._
+import craft._
 import cde._
 import testchipip._
 import uncore.tilelink._
