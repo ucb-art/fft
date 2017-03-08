@@ -6,7 +6,9 @@ package fft
 
 import chisel3.util._
 import chisel3._
+import chisel3.experimental._
 import chisel3.core.ExplicitCompileOptions
+import chisel3.internal.firrtl.KnownBinaryPoint
 import dsptools._
 import dsptools.numbers._
 import dsptools.numbers.implicits._
@@ -15,21 +17,15 @@ import dspblocks._
 import scala.math._
 import rocketchip.PeripheryUtils
 import junctions._
+import craft._
 import cde._
 import testchipip._
 import uncore.tilelink._
 
-/**
-  * IO Bundle for FFT
-  * @tparam T
-  */
-class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasGenParameters[DspComplex[T], DspComplex[T]] {
 
-  val in = Input(ValidWithSync(Vec(lanesIn, genIn())))
+class DirectFFTIO[T<:Data:Real](genMid: DspComplex[T])(implicit val p: Parameters) extends Bundle with HasGenParameters[DspComplex[T], DspComplex[T]] {
+  val in = Input(ValidWithSync(Vec(lanesIn, genMid)))
   val out = Output(ValidWithSync(Vec(lanesOut, genOut())))
-
-  val data_set_end_status = Output(Bool())
-  val data_set_end_clear = Input(Bool())
 }
 
 /**
@@ -38,11 +34,10 @@ class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasG
   * note, this is always a p-point FFT, though the twiddle factors will be different if p < n
   * @tparam T
   */
-class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
-    with HasFFTGenParameters[DspComplex[T]] {
+class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], genOutFull: DspComplex[T])(implicit val p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
   val config: FFTConfig = p(FFTKey(p(DspBlockId)))
 
-  val io = IO(new FFTIO[T])
+  val io = IO(new DirectFFTIO[T](genMid))
 
   // synchronize
   val valid_delay = Reg(next=io.in.valid)
@@ -51,8 +46,8 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
   io.out.valid := ShiftRegisterWithReset(io.in.valid, config.direct_pipe, 0.U, true.B)
 
   // wire up twiddles
-  val genTwiddleReal = genTwiddle.getOrElse(genOut()).real
-  val genTwiddleImag = genTwiddle.getOrElse(genOut()).imag
+  val genTwiddleReal = genTwiddle.real
+  val genTwiddleImag = genTwiddle.imag
   // This should work and would simplify the firrtl, but... it doesn't seem to work
   //val twiddle_rom = Vec(config.twiddle.map(x =>
   //  DspComplex(genTwiddleReal.fromDoubleWithFixedWidth(x(0)), genTwiddleImag.fromDoubleWithFixedWidth(x(1)))
@@ -70,13 +65,13 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
   val indices_rom = Vec(config.dindices.map(x => UInt(x)))
   // TODO: make this not a multiply
   val start = sync*UInt(lanesIn-1)
-  val twiddle = Vec.fill(lanesIn-1)(Wire(genTwiddle.getOrElse(genOut())))
+  val twiddle = Vec.fill(lanesIn-1)(Wire(genTwiddle))
   // special case when n = 4, because the pattern breaks down
   if (config.n == 4) {
     twiddle := Vec((0 until lanesIn-1).map(x => {
-      val true_branch  = Wire(genTwiddle.getOrElse(genOut()))
+      val true_branch  = Wire(genTwiddle)
       true_branch     := twiddle_rom(0).divj()
-      val false_branch = Wire(genTwiddle.getOrElse(genOut()))
+      val false_branch = Wire(genTwiddle)
       false_branch    := twiddle_rom(0)
       Mux(
         indices_rom(start+UInt(x))(log2Ceil(config.n/4)),
@@ -86,9 +81,9 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
     }))
   } else {
     twiddle := Vec((0 until lanesIn-1).map(x => {
-      val true_branch  = Wire(genTwiddle.getOrElse(genOut()))
+      val true_branch  = Wire(genTwiddle)
       true_branch     := twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4)-1, 0)).divj()
-      val false_branch = Wire(genTwiddle.getOrElse(genOut()))
+      val false_branch = Wire(genTwiddle)
       false_branch    := twiddle_rom(indices_rom(start+UInt(x)))
 
       val index = indices_rom(start+UInt(x))
@@ -101,7 +96,7 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
 
   // p-point decimation-in-time direct form FFT with inputs in normal order
   // (outputs bit reversed)
-  val stage_outputs = List.fill(log2Up(lanesIn)+1)(List.fill(lanesIn)(Wire(genOut())))
+  val stage_outputs = List.fill(log2Up(lanesIn)+1)(List.fill(lanesIn)(Wire(genOutFull)))
   io.in.bits.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
 
   // indices to the twiddle Vec
@@ -133,7 +128,13 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
   }
 
   // wire up top-level outputs
+  // note, truncation happens here!
   io.out.bits := stage_outputs(log2Up(lanesIn))
+}
+
+class BiplexFFTIO[T<:Data:Real](genMid: DspComplex[T])(implicit val p: Parameters) extends Bundle with HasGenParameters[DspComplex[T], DspComplex[T]] {
+  val in = Input(ValidWithSync(Vec(lanesIn, genIn())))
+  val out = Output(ValidWithSync(Vec(lanesOut, genMid)))
 }
 
 /**
@@ -142,10 +143,10 @@ class DirectFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module
   * note, this is always a bp-point FFT
   * @tparam T
   */
-class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasFFTGenParameters[DspComplex[T]] {
+class BiplexFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T])(implicit val p: Parameters) extends Module with HasGenParameters[DspComplex[T], DspComplex[T]] {
   val config = p(FFTKey(p(DspBlockId)))
 
-  val io = IO(new FFTIO[T])
+  val io = IO(new BiplexFFTIO[T](genMid))
 
   // synchronize
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
@@ -157,8 +158,8 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   io.out.valid := ShiftRegisterWithReset(io.in.valid, stage_delays.reduce(_+_) + config.biplex_pipe, 0.U, true.B)
 
   // wire up twiddles
-  val genTwiddleReal = genTwiddle.getOrElse(genOut()).real
-  val genTwiddleImag = genTwiddle.getOrElse(genOut()).imag
+  val genTwiddleReal = genTwiddle.real
+  val genTwiddleImag = genTwiddle.imag
   val twiddle_rom = Vec(config.twiddle.map(x => {
     val real = Wire(genTwiddleReal.cloneType)
     val imag = Wire(genTwiddleImag.cloneType)
@@ -171,12 +172,12 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   }))
   val indices_rom = Vec(config.bindices.map(x => UInt(x)))
   val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegisterMem(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_))(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
-  val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle.getOrElse(genOut())))
+  val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle))
   // special cases
   if (config.n == 4) {
     twiddle := Vec((0 until log2Up(config.bp)).map(x => {
-      val true_branch  = Wire(genTwiddle.getOrElse(genOut()))
-      val false_branch = Wire(genTwiddle.getOrElse(genOut()))
+      val true_branch  = Wire(genTwiddle)
+      val false_branch = Wire(genTwiddle)
       true_branch     := twiddle_rom(0).divj()
       false_branch    := twiddle_rom(0)
       Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
@@ -187,8 +188,8 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
     ))
   } else {
     twiddle := Vec((0 until log2Up(config.bp)).map(x => {
-      val true_branch  = Wire(genTwiddle.getOrElse(genOut()))
-      val false_branch = Wire(genTwiddle.getOrElse(genOut()))
+      val true_branch  = Wire(genTwiddle)
+      val false_branch = Wire(genTwiddle)
       true_branch     := twiddle_rom(indices(x)(log2Ceil(config.n/4)-1, 0)).divj()
       false_branch    := twiddle_rom(indices(x))
       Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
@@ -196,8 +197,8 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
   }
 
   // bp-point decimation-in-time biplex pipelined FFT with outputs in bit-reversed order
-  // TODO: change type? should it all be genIn?
-  val stage_outputs = List.fill(log2Up(config.bp)+2)(List.fill(lanesIn)(Wire(genOut())))
+  // up-scale to genMid immediately for simplicity
+  val stage_outputs = List.fill(log2Up(config.bp)+2)(List.fill(lanesIn)(Wire(genMid)))
   io.in.bits.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
 
   // create the FFT hardware
@@ -225,6 +226,19 @@ class BiplexFFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with 
 }
 
 /**
+  * IO Bundle for FFT
+  * @tparam T
+  */
+class FFTIO[T<:Data:Real]()(implicit val p: Parameters) extends Bundle with HasGenParameters[DspComplex[T], DspComplex[T]] {
+
+  val in = Input(ValidWithSync(Vec(lanesIn, genIn())))
+  val out = Output(ValidWithSync(Vec(lanesOut, genOut())))
+
+  val data_set_end_status = Output(Bool())
+  val data_set_end_clear = Input(Bool())
+}
+
+/**
   * fast fourier transform - cooley-tukey algorithm, decimation-in-time
   * mixed version
   * note, this is always an n-point FFT
@@ -239,6 +253,91 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   require(lanesIn <= config.n, "An n-point FFT cannot have more than n inputs (p must be less than or equal to n)")
 
   val io = IO(new FFTIO[T])
+
+  // calculate direct FFT input bitwidth
+  // this is just the input total width + growth of 1 bit per biplex stage
+  val genMid: DspComplex[T] = {
+    if (config.bp == 1) { genIn() }
+    else {
+      val growth = log2Up(config.bp)
+      genIn().asInstanceOf[DspComplex[T]].underlyingType() match {
+        case "fixed" =>
+          genIn().asInstanceOf[DspComplex[T]].real.asInstanceOf[FixedPoint].binaryPoint match {
+            case KnownBinaryPoint(binaryPoint) =>
+              val totalBits = genIn().asInstanceOf[DspComplex[T]].real.getWidth + growth
+              DspComplex(FixedPoint(totalBits.W, binaryPoint.BP), FixedPoint(totalBits.W, binaryPoint.BP)).asInstanceOf[DspComplex[T]]
+            case _ => throw new DspException("Error: unknown binary point when calculating FFT bitwdiths")
+          }
+        case "sint" => {
+          val totalBits = genIn().asInstanceOf[DspComplex[T]].real.getWidth + growth
+          DspComplex(SInt(totalBits.W), SInt(totalBits.W)).asInstanceOf[DspComplex[T]]
+        }
+        case _ => throw new DspException("Error: unknown type when calculating FFT bitwidths")
+      }
+    }
+  }
+
+  // calculate twiddle factor bitwidth
+  // this has the same fractional bits as the input, but goes up to 2 real bits
+  // or, if the input is an sint, then it's the same as the output pre-truncation
+  val genTwiddleBiplex: DspComplex[T] = {
+    val growth = log2Up(config.bp)
+    genIn().asInstanceOf[DspComplex[T]].underlyingType() match {
+      case "fixed" =>
+        genIn().asInstanceOf[DspComplex[T]].real.asInstanceOf[FixedPoint].binaryPoint match {
+          case KnownBinaryPoint(binaryPoint) =>
+            val totalBits = binaryPoint+2
+            DspComplex(FixedPoint(totalBits.W, (totalBits-2).BP), FixedPoint(totalBits.W, (totalBits-2).BP)).asInstanceOf[DspComplex[T]]
+          case _ => throw new DspException("Error: unknown binary point when calculating FFT bitwdiths")
+        }
+      case "sint" => {
+        val totalBits = genIn().asInstanceOf[DspComplex[T]].real.getWidth + growth
+        DspComplex(SInt(totalBits.W), SInt(totalBits.W)).asInstanceOf[DspComplex[T]]
+      }
+      case _ => throw new DspException("Error: unknown type when calculating FFT bitwidths")
+    }
+  }
+
+  val genTwiddleDirect: DspComplex[T] = {
+    val growth = log2Up(config.n)
+    genIn().asInstanceOf[DspComplex[T]].underlyingType() match {
+      case "fixed" =>
+        genIn().asInstanceOf[DspComplex[T]].real.asInstanceOf[FixedPoint].binaryPoint match {
+          case KnownBinaryPoint(binaryPoint) =>
+            val totalBits = binaryPoint+2
+            DspComplex(FixedPoint(totalBits.W, (totalBits-2).BP), FixedPoint(totalBits.W, (totalBits-2).BP)).asInstanceOf[DspComplex[T]]
+          case _ => throw new DspException("Error: unknown binary point when calculating FFT bitwdiths")
+        }
+      case "sint" => {
+        val totalBits = genIn().asInstanceOf[DspComplex[T]].real.getWidth + growth
+        DspComplex(SInt(totalBits.W), SInt(totalBits.W)).asInstanceOf[DspComplex[T]]
+      }
+      case _ => throw new DspException("Error: unknown type when calculating FFT bitwidths")
+    }
+  }
+
+  // calculate direct FFT output bitwidth
+  // this is just the input total width + growth of 1 bit per FFT stage
+  val genOutDirect: DspComplex[T] = {
+    if (config.bp == 1) { genIn() }
+    else {
+      val growth = log2Up(config.n)
+      genIn().asInstanceOf[DspComplex[T]].underlyingType() match {
+        case "fixed" =>
+          genIn().asInstanceOf[DspComplex[T]].real.asInstanceOf[FixedPoint].binaryPoint match {
+            case KnownBinaryPoint(binaryPoint) =>
+              val totalBits = genIn().asInstanceOf[DspComplex[T]].real.getWidth + growth
+              DspComplex(FixedPoint(totalBits.W, binaryPoint.BP), FixedPoint(totalBits.W, binaryPoint.BP)).asInstanceOf[DspComplex[T]]
+            case _ => throw new DspException("Error: unknown binary point when calculating FFT bitwdiths")
+          }
+        case "sint" => {
+          val totalBits = genIn().asInstanceOf[DspComplex[T]].real.getWidth + growth
+          DspComplex(SInt(totalBits.W), SInt(totalBits.W)).asInstanceOf[DspComplex[T]]
+        }
+        case _ => throw new DspException("Error: unknown type when calculating FFT bitwidths")
+      }
+    }
+  }
 
   // feed in zeros when invalid
   val in = Wire(ValidWithSync(Vec(lanesIn, genIn())))
@@ -261,11 +360,11 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   io.data_set_end_status := dses
 
   // instantiate sub-FFTs
-  val direct = Module(new DirectFFT[T])
+  val direct = Module(new DirectFFT[T](genMid, genTwiddleDirect, genOutDirect))
   io.out <> direct.io.out
 
   if (config.n != lanesIn) {
-    val biplex = Module(new BiplexFFT[T])
+    val biplex = Module(new BiplexFFT[T](genMid, genTwiddleBiplex))
     direct.io.in := biplex.io.out
     biplex.io.in <> in
   } else {
