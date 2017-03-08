@@ -278,15 +278,14 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   }
 
   // calculate twiddle factor bitwidth
-  // this has the same fractional bits as the input, but goes up to 2 real bits
-  // or, if the input is an sint, then it's the same as the output pre-truncation
+  // total input bits
   val genTwiddleBiplex: DspComplex[T] = {
     val growth = log2Up(config.bp)
     genIn().asInstanceOf[DspComplex[T]].underlyingType() match {
       case "fixed" =>
         genIn().asInstanceOf[DspComplex[T]].real.asInstanceOf[FixedPoint].binaryPoint match {
           case KnownBinaryPoint(binaryPoint) =>
-            val totalBits = binaryPoint+2
+            val totalBits = genIn().asInstanceOf[DspComplex[T]].real.getWidth + growth
             DspComplex(FixedPoint(totalBits.W, (totalBits-2).BP), FixedPoint(totalBits.W, (totalBits-2).BP)).asInstanceOf[DspComplex[T]]
           case _ => throw new DspException("Error: unknown binary point when calculating FFT bitwdiths")
         }
@@ -304,7 +303,7 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
       case "fixed" =>
         genIn().asInstanceOf[DspComplex[T]].real.asInstanceOf[FixedPoint].binaryPoint match {
           case KnownBinaryPoint(binaryPoint) =>
-            val totalBits = binaryPoint+2
+            val totalBits = genIn().asInstanceOf[DspComplex[T]].real.getWidth + growth
             DspComplex(FixedPoint(totalBits.W, (totalBits-2).BP), FixedPoint(totalBits.W, (totalBits-2).BP)).asInstanceOf[DspComplex[T]]
           case _ => throw new DspException("Error: unknown binary point when calculating FFT bitwdiths")
         }
