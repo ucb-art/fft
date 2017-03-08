@@ -26,11 +26,11 @@ $(build_dir)/$(long_name).fir: $(call lookup_scala_srcs, $(base_dir)/src) $(all_
 	mkdir -p $(build_dir)
 	cd $(base_dir) && $(SBT) "run-main $(PROJECT).Generator $(CHISEL_ARGS) $(build_dir) $(PROJECT) $(MODEL) $(CFG_PROJECT) $(CONFIG)"
 
-$(build_dir)/$(long_name).top.v $(build_dir)/$(long_name).harness.v: $(build_dir)/$(long_name).fir $(FIRRTL_JAR)
-	cd $(base_dir) && $(SBT) "run-main barstools.tapeout.transforms.GenerateTopAndHarness -i $< --top-o $(build_dir)/$(long_name).top.v --harness-o $(build_dir)/$(long_name).harness.v --syn-top $(VLSITOP) --harness-top $(MODEL)"
+$(build_dir)/$(long_name).v $(build_dir)/$(long_name).harness.v: $(build_dir)/$(long_name).fir $(FIRRTL_JAR)
+	cd $(base_dir) && $(SBT) "run-main barstools.tapeout.transforms.GenerateTopAndHarness -i $< --top-o $(build_dir)/$(long_name).v --harness-o $(build_dir)/$(long_name).harness.v --syn-top $(VLSITOP) --harness-top $(MODEL) --seq-mem-flags \"-o:$(build_dir)/$(long_name).conf\" --list-clocks \"-o:$(build_dir)/$(long_name).domains\""
 
 firrtl: $(build_dir)/$(long_name).fir
-verilog: $(build_dir)/$(long_name).top.v
+verilog: $(build_dir)/$(long_name).v
 
 test: $(all_stamps)
 	$(SBT) test

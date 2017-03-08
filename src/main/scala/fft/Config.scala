@@ -93,33 +93,14 @@ class CustomStandaloneFFTConfig extends Config(FFTConfigBuilder.standalone(
   id = "fft", 
   fftConfig = FFTConfig(
     n = 128,
-    lanes = 16,
-    pipelineDepth = 4
+    lanes = 4,
+    pipelineDepth = 0
   ), 
-  genIn = () => FixedPoint(17.W, 14.BP), 
-  genOut = Some(() => FixedPoint(20.W, 12.BP))
+  genIn = () => FixedPoint(11.W, 17.BP), 
+  genOut = Some(() => FixedPoint(15.W, 14.BP))
 ))
 
 case class FFTKey(id: String) extends Field[FFTConfig]
-
-// [stevo]: select twiddle factor size
-// default is None, which gets mapped to Output
-// if output is fixedpoint, then this is same total bits
-// but only 2 whole bits, the rest fractional
-trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
-  def genTwiddle: Option[T] = {
-    genOut().asInstanceOf[DspComplex[T]].underlyingType() match {
-      case "fixed" =>
-        genOut().asInstanceOf[DspComplex[T]].real.asInstanceOf[FixedPoint].binaryPoint match {
-          case KnownBinaryPoint(binaryPoint) =>
-            val totalBits = genOut().asInstanceOf[DspComplex[T]].real.getWidth
-            Some(DspComplex(FixedPoint(totalBits.W, (totalBits-2).BP), FixedPoint(totalBits.W, (totalBits-2).BP)).asInstanceOf[T])
-          case _ => None
-        }
-      case _ => None
-    }
-  }
-}
 
 /**
   * Case class for holding FFT configuration information
@@ -130,7 +111,7 @@ trait HasFFTGenParameters[T <: Data] extends HasGenParameters[T, T] {
   * @param lanes Number of parallel input and output lanes
   * @param real Not currently used
   */
-case class FFTConfig(n: Int = 8, // n-point FFT
+case class FFTConfig(n: Int = 16, // n-point FFT
                      pipelineDepth: Int = 0,
                      lanes: Int = 8,
                      real: Boolean = false // real inputs?
@@ -189,5 +170,6 @@ case class FFTConfig(n: Int = 8, // n-point FFT
     q = q/2
   }
   val dindices = (0 until temp.size).map(x => temp((x*2)%temp.size+x*2/temp.size)).flatten
+
 }
 
