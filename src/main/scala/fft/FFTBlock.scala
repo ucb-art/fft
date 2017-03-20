@@ -29,5 +29,5 @@ class FFTBlockModule[T <: Data : Real](outer: DspBlock)(implicit p: Parameters)
   status("Data_Set_End_Status") := module.io.data_set_end_status
   module.io.data_set_end_clear := control("Data_Set_End_Clear")
 
-  IPXactComponents._ipxactComponents += DspIPXact.makeDspBlockComponent(baseAddr, uuid, module.name)
+  IPXactComponents._ipxactComponents += DspIPXact.makeDspBlockComponent(baseAddr, uuid, this.name)
 }
