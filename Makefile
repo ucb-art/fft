@@ -15,7 +15,7 @@ FIRRTL_JAR ?= $(ROCKETCHIP_DIR)/firrtl/utils/bin/firrtl.jar
 FIRRTL ?= java -Xmx2G -Xss8M -cp $(FIRRTL_JAR) firrtl.Driver
 
 CHISEL_ARGS ?= 
-build_dir ?= generated-src
+build_dir ?= $(base_dir)/generated-src
 PROJECT ?= craft
 MODEL ?= DspTop
 CFG_PROJECT ?= fft
@@ -34,8 +34,7 @@ $(build_dir)/$(long_name).v $(build_dir)/$(long_name).harness.v $(build_dir)/$(l
 	cd $(base_dir) && $(SBT) "run-main barstools.tapeout.transforms.GenerateTopAndHarness -i $< --top-o $(build_dir)/$(long_name).v --harness-o $(build_dir)/$(long_name).harness.v --syn-top $(VLSITOP) --harness-top $(MODEL) --seq-mem-flags \"-o:$(build_dir)/$(long_name).conf\" --list-clocks \"-o:$(build_dir)/$(long_name).domains\""
 
 $(build_dir)/$(long_name).mems.v $(build_dir)/mems.behav.v: $(build_dir)/$(long_name).conf $(MEM_GEN)
-	cd $(build_dir) && $(MEM_GEN) --conf $(long_name).conf --v $(long_name).mems.v --generate --behav mems.behav.v
-
+	cd $(build_dir) && $(MEM_GEN) --conf $(long_name).conf --v $(long_name).mems.v --generate --behav mems.behav.v --ipxact "$(wildcard $(build_dir)/*.xml)"
 
 firrtl: $(build_dir)/$(long_name).fir
 verilog: $(build_dir)/$(long_name).v
