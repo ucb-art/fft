@@ -118,10 +118,10 @@ class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], 
       // hook it up
       val outputs           = List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip))
       val shr_delay         = config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(lanesIn)-i).foldLeft(0)(_+_)
-      val shr               = ShiftRegisterMem[DspComplex[T]](twiddle(indices(j)(i)), shr_delay, io.in.valid, name = this.name + s"_${i}_${j}_twiddle_sram")
+      val shr               = ShiftRegisterMem[DspComplex[T]](twiddle(indices(j)(i)), shr_delay, name = this.name + s"_${i}_${j}_twiddle_sram")
       val butterfly_outputs = Butterfly[T](Seq(stage_outputs(i)(start), stage_outputs(i)(start+skip)), shr)
       outputs.zip(butterfly_outputs).foreach { x =>
-        x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), io.in.valid, name = this.name + s"_${i}_${j}_pipeline_sram")
+        x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), name = this.name + s"_${i}_${j}_pipeline_sram")
       }
 
     }
