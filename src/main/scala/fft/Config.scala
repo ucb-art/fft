@@ -96,7 +96,7 @@ class CustomStandaloneFFTConfig extends Config(FFTConfigBuilder.standalone(
     lanes = 4,
     pipelineDepth = 7
   ), 
-  genIn = () => FixedPoint(11.W, 17.BP), 
+  genIn = () => FixedPoint(12.W, 17.BP), 
   genOut = Some(() => FixedPoint(15.W, 14.BP))
 ))
 
