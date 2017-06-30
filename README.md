@@ -21,11 +21,11 @@ Clone the repository and update the depenedencies:
 git clone git@github.com:ucb-art/fft.git
 git submodule update --init
 cd dsp-framework
-./update.bash
+./update.bash no_hwacha
 cd ..
 ```
 
-See the [https://github.com/ucb-art/dsp-framework/blob/master/README.md](dsp-framework README) for more details on this infrastructure.
+See the [dsp-framework README](https://github.com/ucb-art/dsp-framework/blob/master/README.md) for more details on this infrastructure.
 Build the dependencies by typing `make libs`.
 
 ## Building
@@ -58,7 +58,7 @@ Choosing lanes = FFT size (n) (both default to 8) only creates a direct form FFT
 
 ## Interfaces
 
-The PFB uses the [https://github.com/ucb-art/rocket-dsp-utils/blob/master/doc/stream.md](DSP streaming interface) (a subset of AXI4-Stream) on both the data input and data output.
+The FFT uses the [DSP streaming interface](https://github.com/ucb-art/rocket-dsp-utils/blob/master/doc/stream.md) (a subset of AXI4-Stream) on both the data input and data output.
 There are nominally no status or control registers, so no SCR file exists.
 
 ## Signaling
