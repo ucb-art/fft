@@ -81,12 +81,12 @@ class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], 
     }))
   } else {
     twiddle := Vec((0 until lanesIn-1).map(x => {
-      val true_branch  = Wire(genTwiddle)
-      true_branch     := twiddle_rom(indices_rom(start+UInt(x))(log2Ceil(config.n/4)-1, 0)).divj()
-      val false_branch = Wire(genTwiddle)
-      false_branch    := twiddle_rom(indices_rom(start+UInt(x)))
-
       val index = indices_rom(start+UInt(x))
+      val true_branch  = Wire(genTwiddle)
+      true_branch     := twiddle_rom(index(log2Ceil(config.n/4)-1, 0)).divj()
+      val false_branch = Wire(genTwiddle)
+      false_branch    := twiddle_rom(index)
+
       Mux(index(log2Ceil(config.n/4)),
           true_branch,
           false_branch

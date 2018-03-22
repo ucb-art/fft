@@ -22,8 +22,24 @@ class FFTBlock[T <: Data : Real]()(implicit p: Parameters) extends DspBlock()(p)
 class FFTBlockModule[T <: Data : Real](outer: DspBlock)(implicit p: Parameters)
   extends GenDspBlockModule[T, T](outer)(p) {
   val module = Module(new FFT[T])
+  val config = p(FFTKey(p(DspBlockId)))
   
-  module.io.in <> unpackInput(lanesIn, genIn())
+  if (config.real) {
+    val temp = unpackInput(lanesIn, genIn().asInstanceOf[DspComplex[T]].real.cloneType)
+    module.io.in.sync := temp.sync
+    module.io.in.valid := temp.valid
+    val bitsin = Wire(Vec(lanesIn, genIn()))
+    for (i <- 0 until bitsin.size) {
+      val c = bitsin(i)
+      val r = temp.bits(i)
+      c.asInstanceOf[DspComplex[T]].real := r
+      c.asInstanceOf[DspComplex[T]].imag := Real[T].zero
+    }
+    //bitsin.zip(temp.bits).foreach { case (c, r) => c := DspComplex(r, Real[T].zero) }
+    module.io.in.bits := bitsin
+  } else {
+    module.io.in <> unpackInput(lanesIn, genIn())
+  }
   unpackOutput(lanesOut, genOut()) <> module.io.out
 
   status("Data_Set_End_Status") := module.io.data_set_end_status

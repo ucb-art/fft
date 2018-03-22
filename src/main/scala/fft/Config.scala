@@ -119,6 +119,7 @@ case class FFTConfig(n: Int = 16, // n-point FFT
   require(n >= 4, "For an n-point FFT, n must be 4 or more")
   require(isPow2(n), "For an n-point FFT, n must be a power of 2")
   require(pipelineDepth >= 0, "Cannot have negative pipelining, you silly goose.")
+  //if (pipelineDepth < 0) { pipelineDepth = log2Up(n) }
 
   // bit reverse a value
   def bit_reverse(in: Int, width: Int): Int = {
