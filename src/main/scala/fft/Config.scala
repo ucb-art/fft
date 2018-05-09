@@ -114,7 +114,8 @@ case class FFTKey(id: String) extends Field[FFTConfig]
 case class FFTConfig(n: Int = 16, // n-point FFT
                      pipelineDepth: Int = 0,
                      lanes: Int = 8,
-                     real: Boolean = false // real inputs?
+                     real: Boolean = false, // real inputs?
+                     quadrature: Boolean = true
                     ) {
   require(n >= 4, "For an n-point FFT, n must be 4 or more")
   require(isPow2(n), "For an n-point FFT, n must be a power of 2")
@@ -135,7 +136,8 @@ case class FFTConfig(n: Int = 16, // n-point FFT
   }
 
   // bp stands for biplex points, so the biplex FFT is a bp-point FFT
-  val bp = n/lanes
+  val lanes_new = if (quadrature) lanes/2 else lanes
+  val bp = n/lanes_new
 
   // pipelining
   val num = (log2Up(n)+1).toDouble
@@ -143,7 +145,7 @@ case class FFTConfig(n: Int = 16, // n-point FFT
   val stages_to_pipeline = (0 until pipelineDepth%log2Up(n)).map(x => if (ratio*(x+1) < num/2 && ratio*(x+1)-0.5 == floor(ratio*(x+1))) floor(ratio*(x+1)).toInt else round(ratio*(x+1)).toInt)
   val pipe = (0 until log2Up(n)).map(x => floor(pipelineDepth/log2Up(n)).toInt + {if (stages_to_pipeline contains (x+1)) 1 else 0})
   val direct_pipe = pipe.drop(log2Up(bp)).foldLeft(0)(_+_)
-  val biplex_pipe = pipe.dropRight(log2Up(lanes)).foldLeft(0)(_+_)
+  val biplex_pipe = pipe.dropRight(log2Up(lanes_new)).foldLeft(0)(_+_)
   println("Pipeline registers inserted on stages: " + pipe.toArray.deep.mkString(","))
   println(s"Total biplex pipeline depth: $biplex_pipe")
   println(s"Total direct pipeline depth: $direct_pipe")
@@ -156,7 +158,7 @@ case class FFTConfig(n: Int = 16, // n-point FFT
   var prev = Array.fill(log2Up(n))(0)
   for (i <- 1 until n/2) {
     val next = (0 until log2Up(n)).map(x => floor(i/pow(2,x)).toInt).reverse
-    prev.zip(next).foreach{case(lanes,n) => {if (n != lanes) indices = indices :+ n}}
+    prev.zip(next).foreach{case(px,nx) => {if (nx != px) indices = indices :+ nx}}
     prev = next.toArray
   }
   indices = indices.map(x => bit_reverse(x, log2Up(n)-1))
@@ -165,7 +167,7 @@ case class FFTConfig(n: Int = 16, // n-point FFT
   var q = n
   var temp = Array(indices)
   var bindices = Array[Int]()
-  while (q > lanes) {
+  while (q > lanes_new) {
     temp.foreach{x => bindices = bindices ++ x.take(1)}
     temp = temp.map(x => x.drop(1).splitAt((x.size-1)/2)).flatMap(x => Array(x._1, x._2))
     q = q/2
