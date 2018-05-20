@@ -74,11 +74,11 @@ class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], 
       true_branch     := twiddle_rom(0).divj()
       val false_branch = Wire(genTwiddle)
       false_branch    := twiddle_rom(0)
-      Mux(
-        indices_rom(start+UInt(x))(log2Ceil(config.n/4)),
-        true_branch,
+      if (config.tc == 1) {
+        Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)),true_branch,false_branch)
+      } else {
         false_branch
-      )
+      }
     }))
   } else {
     twiddle := Vec((0 until lanes_new-1).map(x => {
@@ -87,11 +87,11 @@ class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], 
       true_branch     := twiddle_rom(index(log2Ceil(config.n/4)-1, 0)).divj()
       val false_branch = Wire(genTwiddle)
       false_branch    := twiddle_rom(index)
-
-      Mux(index(log2Ceil(config.n/4)),
-          true_branch,
-          false_branch
-      )
+      if (config.tc == 1) {
+        Mux(index(log2Ceil(config.n/4)),true_branch,false_branch)
+      } else {
+        false_branch
+      }
     }))
   }
 
@@ -236,7 +236,11 @@ class BiplexFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T])(
       val false_branch = Wire(genTwiddle)
       true_branch     := twiddle_rom(0).divj()
       false_branch    := twiddle_rom(0)
-      Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
+      if (config.tc == 1) {
+        Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
+      } else {
+        false_branch
+      }
     }))
   } else if (config.bp == 2) {
     twiddle := Vec((0 until log2Up(config.bp)).map(x =>
@@ -248,7 +252,11 @@ class BiplexFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T])(
       val false_branch = Wire(genTwiddle)
       true_branch     := twiddle_rom(indices(x)(log2Ceil(config.n/4)-1, 0)).divj()
       false_branch    := twiddle_rom(indices(x))
-      Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
+      if (config.tc == 1) {
+        Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
+      } else {
+        false_branch
+      }
     }))
   }
 

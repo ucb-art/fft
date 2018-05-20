@@ -92,12 +92,14 @@ class DefaultStandaloneFixedPointFFTConfig extends Config(FFTConfigBuilder.stand
 class CustomStandaloneFFTConfig extends Config(FFTConfigBuilder.standalone(
   id = "fft", 
   fftConfig = FFTConfig(
-    n = 128,
-    lanes = 4,
-    pipelineDepth = 7
+    n = 8192,
+    lanes = 32,
+    pipelineDepth = 13,
+    real = true,
+    quadrature = true
   ), 
-  genIn = () => FixedPoint(12.W, 17.BP), 
-  genOut = Some(() => FixedPoint(15.W, 14.BP))
+  genIn = () => FixedPoint(12.W, 8.BP), 
+  genOut = Some(() => FixedPoint(18.W, 8.BP))
 ))
 
 case class FFTKey(id: String) extends Field[FFTConfig]
@@ -115,7 +117,8 @@ case class FFTConfig(n: Int = 16, // n-point FFT
                      pipelineDepth: Int = 0,
                      lanes: Int = 8,
                      real: Boolean = false, // real inputs?
-                     quadrature: Boolean = true
+                     quadrature: Boolean = true,
+                     val tc: Int = 0 // twiddle compression, current options: 0, 1
                     ) {
   require(n >= 4, "For an n-point FFT, n must be 4 or more")
   require(isPow2(n), "For an n-point FFT, n must be a power of 2")
@@ -151,7 +154,7 @@ case class FFTConfig(n: Int = 16, // n-point FFT
   println(s"Total direct pipeline depth: $direct_pipe")
 
   // twiddling
-  val twiddle = (0 until n/4).map(x => Array(cos(2*Pi/n*x),-sin(2*Pi/n*x)))
+  val twiddle = (0 until n/2).map(x => Array(cos(2*Pi/n*x),-sin(2*Pi/n*x)))
 
   // indicies to the twiddle factors
   var indices = Array.fill(log2Up(n))(0)
