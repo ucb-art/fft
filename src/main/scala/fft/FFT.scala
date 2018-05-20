@@ -64,8 +64,8 @@ class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], 
     twiddle
   }))
   val indices_rom = Vec(config.dindices.map(x => UInt(x)))
-  // TODO: make this not a multiply
-  val start = sync*UInt(lanes_new-1)
+  require(isPow2(lanes_new), "FFT lanes must be power of 2")
+  val start = (sync << UInt(log2Ceil(lanes_new))) - sync
   val twiddle = Vec.fill(lanes_new-1)(Wire(genTwiddle))
   // special case when n = 4, because the pattern breaks down
   if (config.n == 4) {
@@ -119,21 +119,19 @@ class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], 
 
         val skip = pow(2,log2Up(config.n/2)-(i+log2Ceil(config.bp))).toInt
         val start = ((j % skip) + floor(j/skip) * skip*2).toInt
+        val shr_delay = config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(lanes_new)-i).foldLeft(0)(_+_)
+        val shr = ShiftRegisterMem[DspComplex[T]](twiddle(indices(j)(i)), shr_delay, name = this.name + s"_${i}_${j}_twiddle_sram")
 
         // hook it up
         val outputs_i           = List(stage_outputs_i(i+1)(start), stage_outputs_i(i+1)(start+skip))
-        val shr_delay_i         = config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(lanes_new)-i).foldLeft(0)(_+_)
-        val shr_i               = ShiftRegisterMem[DspComplex[T]](twiddle(indices(j)(i)), shr_delay_i, name = this.name + s"_${i}_${j}_twiddle_sram")
-        val butterfly_outputs_i = Butterfly[T](Seq(stage_outputs_i(i)(start), stage_outputs_i(i)(start+skip)), shr_i)
+        val butterfly_outputs_i = Butterfly[T](Seq(stage_outputs_i(i)(start), stage_outputs_i(i)(start+skip)), shr)
         outputs_i.zip(butterfly_outputs_i).foreach { x =>
           x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), name = this.name + s"_${i}_${j}_pipeline_sram")
         }
 
         // hook it up
         val outputs_q           = List(stage_outputs_q(i+1)(start), stage_outputs_q(i+1)(start+skip))
-        val shr_delay_q         = config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(lanes_new)-i).foldLeft(0)(_+_)
-        val shr_q               = ShiftRegisterMem[DspComplex[T]](twiddle(indices(j)(i)), shr_delay_q, name = this.name + s"_${i}_${j}_twiddle_sram")
-        val butterfly_outputs_q = Butterfly[T](Seq(stage_outputs_q(i)(start), stage_outputs_q(i)(start+skip)), shr_q)
+        val butterfly_outputs_q = Butterfly[T](Seq(stage_outputs_q(i)(start), stage_outputs_q(i)(start+skip)), shr)
         outputs_q.zip(butterfly_outputs_q).foreach { x =>
           x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), name = this.name + s"_${i}_${j}_pipeline_sram")
         }

@@ -231,7 +231,7 @@ class FFTSpec extends FlatSpec with Matchers {
       implicit val p: Parameters = Parameters.root(
         FFTConfigBuilder.standalone(
           "fft",
-          FFTConfig(n = test(0), lanes = test(1), pipelineDepth = test(4)),
+          FFTConfig(n = test(0), lanes = test(1), pipelineDepth = test(4), quadrature=false),
           {() => FixedPoint(totalWidth.W, fractionalBits.BP)}
         ).toInstance
       )
