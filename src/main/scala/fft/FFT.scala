@@ -49,51 +49,17 @@ class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], 
   // wire up twiddles
   val genTwiddleReal = genTwiddle.real
   val genTwiddleImag = genTwiddle.imag
-  // This should work and would simplify the firrtl, but... it doesn't seem to work
-  //val twiddle_rom = Vec(config.twiddle.map(x =>
-  //  DspComplex(genTwiddleReal.fromDoubleWithFixedWidth(x(0)), genTwiddleImag.fromDoubleWithFixedWidth(x(1)))
-  //))
-  val twiddle_rom = Vec(config.twiddle.map( x => {
+  // cleaner version possible?
+  val twiddle_rom = config.dtwiddles.map(i => {Vec(i.map(j => {
     val real = Wire(genTwiddleReal.cloneType)
     val imag = Wire(genTwiddleImag.cloneType)
-    real := genTwiddleReal.fromDouble(x(0))
-    imag := genTwiddleImag.fromDouble(x(1))
+    real := genTwiddleReal.fromDouble(j(0))
+    imag := genTwiddleImag.fromDouble(j(1))
     val twiddle = Wire(DspComplex(genTwiddleReal, genTwiddleImag))
     twiddle.real := real
     twiddle.imag := imag
     twiddle
-  }))
-  val indices_rom = Vec(config.dindices.map(x => UInt(x)))
-  require(isPow2(lanes_new), "FFT lanes must be power of 2")
-  val start = (sync << UInt(log2Ceil(lanes_new))) - sync
-  val twiddle = Vec.fill(lanes_new-1)(Wire(genTwiddle))
-  // special case when n = 4, because the pattern breaks down
-  if (config.n == 4) {
-    twiddle := Vec((0 until lanes_new-1).map(x => {
-      val true_branch  = Wire(genTwiddle)
-      true_branch     := twiddle_rom(0).divj()
-      val false_branch = Wire(genTwiddle)
-      false_branch    := twiddle_rom(0)
-      if (config.tc == 1) {
-        Mux(indices_rom(start+UInt(x))(log2Ceil(config.n/4)),true_branch,false_branch)
-      } else {
-        false_branch
-      }
-    }))
-  } else {
-    twiddle := Vec((0 until lanes_new-1).map(x => {
-      val index = indices_rom(start+UInt(x))
-      val true_branch  = Wire(genTwiddle)
-      true_branch     := twiddle_rom(index(log2Ceil(config.n/4)-1, 0)).divj()
-      val false_branch = Wire(genTwiddle)
-      false_branch    := twiddle_rom(index)
-      if (config.tc == 1) {
-        Mux(index(log2Ceil(config.n/4)),true_branch,false_branch)
-      } else {
-        false_branch
-      }
-    }))
-  }
+  }))})
 
   // p-point decimation-in-time direct form FFT with inputs in normal order
   // (outputs bit reversed)
@@ -104,36 +70,25 @@ class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], 
     stage_outputs_i(0).zip(io.in.bits.take(lanes_new)).foreach { case(out, in) => out := in }
     stage_outputs_q(0).zip(io.in.bits.drop(lanes_new)).foreach { case(out, in) => out := in }
 
-    // indices to the twiddle Vec
-    var indices = List(List(0,1),List(0,2))
-    for (i <- 0 until log2Up(lanes_new)-2) {
-      indices = indices.map(x => x.map(y => y+1))
-      val indices_max = indices.foldLeft(0)((b,a) => max(b,a.reduceLeft((d,c) => max(c,d))))
-      indices = indices ++ indices.map(x => x.map(y => y+indices_max))
-      indices = indices.map(x => 0 +: x)
-    }
-
     // create the FFT hardware
     for (i <- 0 until log2Up(lanes_new)) {
       for (j <- 0 until lanes_new/2) {
 
         val skip = pow(2,log2Up(config.n/2)-(i+log2Ceil(config.bp))).toInt
         val start = ((j % skip) + floor(j/skip) * skip*2).toInt
-        val shr_delay = config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(lanes_new)-i).foldLeft(0)(_+_)
-        val shr = ShiftRegisterMem[DspComplex[T]](twiddle(indices(j)(i)), shr_delay, name = this.name + s"_${i}_${j}_twiddle_sram")
 
         // hook it up
         val outputs_i           = List(stage_outputs_i(i+1)(start), stage_outputs_i(i+1)(start+skip))
-        val butterfly_outputs_i = Butterfly[T](Seq(stage_outputs_i(i)(start), stage_outputs_i(i)(start+skip)), shr)
+        val butterfly_outputs_i = Butterfly[T](Seq(stage_outputs_i(i)(start), stage_outputs_i(i)(start+skip)), twiddle_rom(config.tdindices(j)(i))(sync))
         outputs_i.zip(butterfly_outputs_i).foreach { x =>
-          x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), name = this.name + s"_${i}_${j}_pipeline_sram")
+          x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), name = this.name + s"_${i}_${j}_i_pipeline_sram")
         }
 
         // hook it up
         val outputs_q           = List(stage_outputs_q(i+1)(start), stage_outputs_q(i+1)(start+skip))
-        val butterfly_outputs_q = Butterfly[T](Seq(stage_outputs_q(i)(start), stage_outputs_q(i)(start+skip)), shr)
+        val butterfly_outputs_q = Butterfly[T](Seq(stage_outputs_q(i)(start), stage_outputs_q(i)(start+skip)), twiddle_rom(config.tdindices(j)(i))(sync))
         outputs_q.zip(butterfly_outputs_q).foreach { x =>
-          x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), name = this.name + s"_${i}_${j}_pipeline_sram")
+          x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), name = this.name + s"_${i}_${j}_q_pipeline_sram")
         }
 
       }
@@ -147,15 +102,6 @@ class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], 
     val stage_outputs = List.fill(log2Up(lanesIn)+1)(List.fill(lanesIn)(Wire(genOutFull)))
     io.in.bits.zip(stage_outputs(0)).foreach { case(in, out) => out := in }
 
-    // indices to the twiddle Vec
-    var indices = List(List(0,1),List(0,2))
-    for (i <- 0 until log2Up(lanesIn)-2) {
-      indices = indices.map(x => x.map(y => y+1))
-      val indices_max = indices.foldLeft(0)((b,a) => max(b,a.reduceLeft((d,c) => max(c,d))))
-      indices = indices ++ indices.map(x => x.map(y => y+indices_max))
-      indices = indices.map(x => 0 +: x)
-    }
-
     // create the FFT hardware
     for (i <- 0 until log2Up(lanesIn)) {
       for (j <- 0 until lanesIn/2) {
@@ -165,9 +111,7 @@ class DirectFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T], 
 
         // hook it up
         val outputs           = List(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip))
-        val shr_delay         = config.pipe.drop(log2Ceil(config.bp)).dropRight(log2Up(lanesIn)-i).foldLeft(0)(_+_)
-        val shr               = ShiftRegisterMem[DspComplex[T]](twiddle(indices(j)(i)), shr_delay, name = this.name + s"_${i}_${j}_twiddle_sram")
-        val butterfly_outputs = Butterfly[T](Seq(stage_outputs(i)(start), stage_outputs(i)(start+skip)), shr)
+        val butterfly_outputs = Butterfly[T](Seq(stage_outputs(i)(start), stage_outputs(i)(start+skip)), twiddle_rom(config.tdindices(j)(i))(sync))
         outputs.zip(butterfly_outputs).foreach { x =>
           x._1 := ShiftRegisterMem(x._2, config.pipe(i+log2Ceil(config.bp)), name = this.name + s"_${i}_${j}_pipeline_sram")
         }
@@ -202,64 +146,30 @@ class BiplexFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T])(
   val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
   val sync = List.fill(log2Up(config.bp)+1)(Wire(UInt(width=log2Up(config.bp))))
   val valid_delay = Reg(next=io.in.valid)
-  //sync(0) := CounterWithReset(true.B, config.bp, io.in.sync, ~valid_delay & io.in.valid)._1
-  //sync.drop(1).zip(sync).zip(stage_delays).foreach { case ((next, prev), delay) => next := ShiftRegisterWithReset(prev, delay, 0.U) }
+  // [stevo]: reset all internal syncs to correct value immediately upon syncronization signal, io.in.sync or io.in.valid rising edge
   def sync_reset_val(index: Int): Int = {
     if (index == 0) { 0 }
     else { (-stage_delays.take(index).reduce(_+_)%config.bp)+config.bp }
   }
   sync.zipWithIndex.foreach { case (s, i) => s := CounterWithReset(true.B, config.bp, io.in.sync, ~valid_delay & io.in.valid, sync_reset_val(i).U, sync_reset_val(i).U)._1 }
   io.out.sync := sync(log2Up(config.bp)) === UInt((config.bp/2-1+config.biplex_pipe)%config.bp)
-  // [stevo]: delay is 2*stage delays, since worst-case goes through both
   io.out.valid := ShiftRegisterWithReset(io.in.valid, stage_delays.reduce(_+_) + config.biplex_pipe, 0.U)
 
   // wire up twiddles
+  // fortunately each column in the biplex has the same twiddle vavlue, so they're truely parallel FFTs
   val genTwiddleReal = genTwiddle.real
   val genTwiddleImag = genTwiddle.imag
-  val twiddle_rom = Vec(config.twiddle.map(x => {
+  // cleaner version possible?
+  val twiddle_rom = config.btwiddles.map(i => {Vec(i.map(j => {
     val real = Wire(genTwiddleReal.cloneType)
     val imag = Wire(genTwiddleImag.cloneType)
-    real := genTwiddleReal.fromDouble(x(0))
-    imag := genTwiddleImag.fromDouble(x(1))
+    real := genTwiddleReal.fromDouble(j(0))
+    imag := genTwiddleImag.fromDouble(j(1))
     val twiddle = Wire(DspComplex(genTwiddleReal, genTwiddleImag))
     twiddle.real := real
     twiddle.imag := imag
     twiddle
-  }))
-  val indices_rom = Vec(config.bindices.map(x => UInt(x)))
-  val indices = (0 until log2Up(config.bp)).map(x => indices_rom(UInt((pow(2,x)-1).toInt) +& { if (x == 0) UInt(0) else ShiftRegisterMem(sync(x+1), config.pipe.dropRight(log2Up(config.n)-x).reduceRight(_+_), name = this.name + s"_twiddle_sram")(log2Up(config.bp)-2,log2Up(config.bp)-1-x) }))
-  val twiddle = Vec.fill(log2Up(config.bp))(Wire(genTwiddle))
-  // special cases
-  if (config.n == 4) {
-    twiddle := Vec((0 until log2Up(config.bp)).map(x => {
-      val true_branch  = Wire(genTwiddle)
-      val false_branch = Wire(genTwiddle)
-      true_branch     := twiddle_rom(0).divj()
-      false_branch    := twiddle_rom(0)
-      if (config.tc == 1) {
-        Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
-      } else {
-        false_branch
-      }
-    }))
-  } else if (config.bp == 2) {
-    twiddle := Vec((0 until log2Up(config.bp)).map(x =>
-      twiddle_rom(indices(x))
-    ))
-  } else {
-    twiddle := Vec((0 until log2Up(config.bp)).map(x => {
-      val true_branch  = Wire(genTwiddle)
-      val false_branch = Wire(genTwiddle)
-      true_branch     := twiddle_rom(indices(x)(log2Ceil(config.n/4)-1, 0)).divj()
-      false_branch    := twiddle_rom(indices(x))
-      if (config.tc == 1) {
-        Mux(indices(x)(log2Ceil(config.n/4)), true_branch, false_branch)
-      } else {
-        false_branch
-      }
-    }))
-  }
-
+  }))})
 
   // bp-point decimation-in-time biplex pipelined FFT with outputs in bit-reversed order
   // up-scale to genMid immediately for simplicity
@@ -285,8 +195,8 @@ class BiplexFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T])(
           Seq(stage_outputs_i(i+1)(start), stage_outputs_i(i+1)(start+skip)).zip(Seq(ShiftRegisterMem(mux_out_i(0), stage_delays(i), name = this.name + s"_${i}_${j}_lasti_sram" ), mux_out_i(1))).foreach { x => x._1 := x._2 }
           Seq(stage_outputs_q(i+1)(start), stage_outputs_q(i+1)(start+skip)).zip(Seq(ShiftRegisterMem(mux_out_q(0), stage_delays(i), name = this.name + s"_${i}_${j}_lastq_sram" ), mux_out_q(1))).foreach { x => x._1 := x._2 }
         } else {
-          Seq(stage_outputs_i(i+1)(start), stage_outputs_i(i+1)(start+skip)).zip(Butterfly(Seq(ShiftRegisterMem(mux_out_i(0), stage_delays(i), name = this.name + s"_${i}_${j}_pipeline0i_sram"), mux_out_i(1)), twiddle(i))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i), name = this.name + s"_${i}_${j}_pipeline1i_sram") }
-          Seq(stage_outputs_q(i+1)(start), stage_outputs_q(i+1)(start+skip)).zip(Butterfly(Seq(ShiftRegisterMem(mux_out_q(0), stage_delays(i), name = this.name + s"_${i}_${j}_pipeline0q_sram"), mux_out_q(1)), twiddle(i))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i), name = this.name + s"_${i}_${j}_pipeline1q_sram") }
+          Seq(stage_outputs_i(i+1)(start), stage_outputs_i(i+1)(start+skip)).zip(Butterfly(Seq(ShiftRegisterMem(mux_out_i(0), stage_delays(i), name = this.name + s"_${i}_${j}_pipeline0i_sram"), mux_out_i(1)), twiddle_rom(i)(sync(i+1)))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i), name = this.name + s"_${i}_${j}_pipeline1i_sram") }
+          Seq(stage_outputs_q(i+1)(start), stage_outputs_q(i+1)(start+skip)).zip(Butterfly(Seq(ShiftRegisterMem(mux_out_q(0), stage_delays(i), name = this.name + s"_${i}_${j}_pipeline0q_sram"), mux_out_q(1)), twiddle_rom(i)(sync(i+1)))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i), name = this.name + s"_${i}_${j}_pipeline1q_sram") }
         }
 
       }
@@ -308,11 +218,11 @@ class BiplexFFT[T<:Data:Real](genMid: DspComplex[T], genTwiddle: DspComplex[T])(
 
         // hook it up
         // last stage just has one extra permutation, no butterfly
-        val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegisterMem(stage_outputs(i)(start+skip), stage_delays(i), name = this.name + s"_${i}_${j}_mux0_sram")), ShiftRegisterMem(sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).reduceRight(_+_)},  name = this.name + s"_${i}_${j}_mux1_sram"))
+        val mux_out = BarrelShifter(Vec(stage_outputs(i)(start), ShiftRegisterMem(stage_outputs(i)(start+skip), stage_delays(i), name = this.name + s"_${i}_${j}_mux0_sram")), ShiftRegisterMem(sync(i)(log2Up(config.bp)-1 - { if (i == log2Up(config.bp)) 0 else i }), {if (i == 0) 0 else config.pipe.dropRight(log2Up(config.n)-i).reduceRight(_+_)}, name = this.name + s"_${i}_${j}_mux1_sram"))
         if (i == log2Up(config.bp)) {
           Seq(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Seq(ShiftRegisterMem(mux_out(0), stage_delays(i), name = this.name + s"_${i}_${j}_last_sram" ), mux_out(1))).foreach { x => x._1 := x._2 }
         } else {
-          Seq(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(Seq(ShiftRegisterMem(mux_out(0), stage_delays(i), name = this.name + s"_${i}_${j}_pipeline0_sram"), mux_out(1)), twiddle(i))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i), name = this.name + s"_${i}_${j}_pipeline1_sram") }
+          Seq(stage_outputs(i+1)(start), stage_outputs(i+1)(start+skip)).zip(Butterfly(Seq(ShiftRegisterMem(mux_out(0), stage_delays(i), name = this.name + s"_${i}_${j}_pipeline0_sram"), mux_out(1)), twiddle_rom(i)(sync(i+1)))).foreach { x => x._1 := ShiftRegisterMem(x._2, config.pipe(i), name = this.name + s"_${i}_${j}_pipeline1_sram") }
         }
 
       }

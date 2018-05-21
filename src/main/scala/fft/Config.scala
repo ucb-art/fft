@@ -30,7 +30,7 @@ import dsptools._
 import dsptools.numbers.{Field=>_,_}
 import dsptools.numbers.implicits._
 
-import scala.collection.mutable.Map
+import scala.collection.mutable.{Map, ArrayBuffer}
 
 object FFTConfigBuilder {
   def apply[T <: Data : Real](
@@ -93,7 +93,7 @@ class CustomStandaloneFFTConfig extends Config(FFTConfigBuilder.standalone(
   id = "fft", 
   fftConfig = FFTConfig(
     n = 8192,
-    lanes = 32,
+    lanes = 64,
     pipelineDepth = 13,
     real = true,
     quadrature = true
@@ -117,8 +117,7 @@ case class FFTConfig(n: Int = 16, // n-point FFT
                      pipelineDepth: Int = 0,
                      lanes: Int = 8,
                      real: Boolean = false, // real inputs?
-                     quadrature: Boolean = true,
-                     val tc: Int = 0 // twiddle compression, current options: 0, 1
+                     quadrature: Boolean = true
                     ) {
   require(n >= 4, "For an n-point FFT, n must be 4 or more")
   require(isPow2(n), "For an n-point FFT, n must be a power of 2")
@@ -136,6 +135,24 @@ case class FFTConfig(n: Int = 16, // n-point FFT
       }
     }
     out
+  }
+
+  def rotateRight[A](seq: Seq[A], i: Int): Seq[A] = {
+    val size = seq.size
+    seq.drop(size - (i % size)) ++ seq.take(size - (i % size))
+  }
+  def rotateLeft[A](seq: Seq[A], i: Int): Seq[A] = {
+    val size = seq.size
+    seq.drop(i % size) ++ seq.take(i % size)
+  }
+
+  def findCol(l: Seq[Seq[Int]], i: Int): Int = {
+    for (row <- l) {
+      row.zipWithIndex.foreach{ case (value, column) => {
+        if (value == i) { return column }
+      }}
+    }
+    return -1
   }
 
   // bp stands for biplex points, so the biplex FFT is a bp-point FFT
@@ -176,6 +193,43 @@ case class FFTConfig(n: Int = 16, // n-point FFT
     q = q/2
   }
   val dindices = (0 until temp.size).map(x => temp((x*2)%temp.size+x*2/temp.size)).flatten
+
+  // how the biplex indices (bindices) map to hardware butterflies
+  var tbindices = List.fill(log2Ceil(bp))(ArrayBuffer.fill(bp/2)(0)) 
+  bindices.zipWithIndex.foreach{ case (bindex, index) => {
+    val col = log2Floor(index+1)
+    val repl = math.pow(2, log2Ceil(bp)-col-1).toInt
+    val start = (index-math.pow(2,col).toInt+1)*repl
+    for (i <- 0 until repl) {
+      tbindices(col)(start+i) = bindex
+    }
+  }}
+
+  // pre-compute set of twiddle factors per-butterfly, including rotation for pipelining
+  val btwiddles = tbindices.zipWithIndex.map{ case(i, index) => {
+    val rot_amt = pipe.dropRight(log2Up(n)-index).foldLeft(0)(_+_)
+    val rot_list = rotateRight(i, rot_amt)
+    rot_list.map(j => twiddle(j))
+  }}
+
+  // how the direct indices (dindices) map to hardware butterflies
+  var tdindices = List(List(0,1),List(0,2))
+  for (i <- 0 until log2Up(lanes_new)-2) {
+    tdindices = tdindices.map(x => x.map(y => y+1))
+    val tdindices_max = tdindices.foldLeft(0)((b,a) => scala.math.max(b,a.reduceLeft((d,c) => scala.math.max(c,d))))
+    tdindices = tdindices ++ tdindices.map(x => x.map(y => y+tdindices_max))
+    tdindices = tdindices.map(x => 0 +: x)
+  }
+
+  // pre-compute set of twiddle factors per-butterfly, including rotation for pipelining
+  val dtwiddles = dindices.grouped(lanes_new-1).toList.transpose.zipWithIndex.map{ case(i,index) => {
+    // rotate array to account for pipelining
+    val col = findCol(tdindices, index)
+    val rot_amt = pipe.drop(log2Ceil(bp)).dropRight(log2Up(lanes_new)-col).foldLeft(0)(_+_)
+    val rot_list = rotateRight(i, rot_amt)
+    // now map to twiddles
+    rot_list.map(j => twiddle(j))
+  }}
 
 }
 

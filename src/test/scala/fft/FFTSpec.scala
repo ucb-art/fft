@@ -217,7 +217,8 @@ class FFTSpec extends FlatSpec with Matchers {
     val tests = Seq(
       // (FFT points, lanes, total width, fractional bits, pipeline depth)
       Seq(8,   8,  35, 19, 0),
-      Seq(128, 16, 27, 16, 17)
+      Seq(128, 16, 27, 16, 17),
+      Seq(32, 4, 27, 16, 0)
     )
 
     for (test <- tests) {
@@ -231,7 +232,7 @@ class FFTSpec extends FlatSpec with Matchers {
       implicit val p: Parameters = Parameters.root(
         FFTConfigBuilder.standalone(
           "fft",
-          FFTConfig(n = test(0), lanes = test(1), pipelineDepth = test(4), quadrature=false),
+          FFTConfig(n = test(0), lanes = test(1), pipelineDepth = test(4), quadrature=false, real = true),
           {() => FixedPoint(totalWidth.W, fractionalBits.BP)}
         ).toInstance
       )

@@ -1,3 +1,8 @@
+lib_dir = $(base_dir)/lib
+framework_dir = $(base_dir)/dsp-framework
+ivy_dir = $(base_dir)/.ivy2
+ROCKETCHIP_DIR=$(framework_dir)/rocket-chip
+TESTCHIPIP_DIR=$(framework_dir)/testchipip
 
 default: mems
 
@@ -13,7 +18,7 @@ build_dir ?= $(base_dir)/generated-src
 PROJECT ?= craft
 MODEL ?= DspTop
 CFG_PROJECT ?= fft
-CONFIG ?= DefaultStandaloneFixedPointFFTConfig
+CONFIG ?= CustomStandaloneFFTConfig
 VLSITOP ?= FFTBlock
 
 long_name = $(PROJECT).$(MODEL).$(CONFIG)
