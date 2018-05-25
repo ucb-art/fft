@@ -265,7 +265,8 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   val io = IO(new FFTIO[T])
 
   // calculate direct FFT input bitwidth
-  // this is just the input total width + growth of 1 bit per biplex stage
+  // truncating every other stage is the same as growing one bit every other stage, so we can
+  // grow by log2(bp)/2 and be okay I think
   val genMid: DspComplex[T] = {
     if (config.bp == 1) { genIn() }
     else {
@@ -308,7 +309,7 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   }
 
   val genTwiddleDirect: DspComplex[T] = {
-    val growth = log2Up(config.n)/2
+    val growth = math.ceil(log2Up(config.n).toDouble/2.0).toInt
     genIn().asInstanceOf[DspComplex[T]].underlyingType() match {
       case "fixed" =>
         genIn().asInstanceOf[DspComplex[T]].real.asInstanceOf[FixedPoint].binaryPoint match {
@@ -330,7 +331,7 @@ class FFT[T<:Data:Real]()(implicit val p: Parameters) extends Module with HasGen
   val genOutDirect: DspComplex[T] = {
     if (config.bp == 1) { genIn() }
     else {
-      val growth = log2Up(config.n)/2
+      val growth = math.ceil(log2Up(config.n).toDouble/2.0).toInt
       genIn().asInstanceOf[DspComplex[T]].underlyingType() match {
         case "fixed" =>
           genIn().asInstanceOf[DspComplex[T]].real.asInstanceOf[FixedPoint].binaryPoint match {
