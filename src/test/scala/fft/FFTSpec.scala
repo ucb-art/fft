@@ -62,7 +62,7 @@ object spectrumTester {
     dut.poke(io.in.valid, 1)
 
     // get delay
-    val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
+    val stage_delays = (0 until log2Ceil(config.bp)+1).map(x => { if (x == log2Ceil(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
     val test_length = config.bp + config.pipelineDepth + stage_delays.reduce(_+_)
 
     // create return val
@@ -110,10 +110,10 @@ object spectrumTester {
       set.zipWithIndex.foreach { case (bin, bindex) => 
         if (bp > 1) {
           val p1 = if (sindex/(bp/2) >= 1) 1 else 0
-          val new_index = bit_reverse((sindex % (bp/2)) * 2 + p1, log2Up(bp)) + bit_reverse(bindex, log2Up(n))
+          val new_index = bit_reverse((sindex % (bp/2)) * 2 + p1, log2Ceil(bp)) + bit_reverse(bindex, log2Ceil(n))
           res(new_index) = bin
         } else {
-          val new_index = bit_reverse(bindex, log2Up(n))
+          val new_index = bit_reverse(bindex, log2Ceil(n))
           res(new_index) = bin
         }
       }
@@ -154,7 +154,7 @@ object spectrumTester {
     // bin-by-bin testing
     val m = 16 // at most 16 bins
     (0 until min(fftSize, m)).foreach{ bin =>
-      val b = if (fftSize > m) round(fftSize/m*bin) else bin
+      val b = if (fftSize > m) fftSize/m*bin else bin
       val tester = setupTester(c, verbose) 
       val tone = getTone(fftSize, b.toDouble/fftSize)
       val testResult = testSignal(tester, tone)
@@ -221,7 +221,7 @@ class FFTSpec extends FlatSpec with Matchers {
       val fractionalBits = test(3)
       implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal {
         override def fromDouble(x: Double): FixedPoint = {
-          FixedPoint.fromDouble(x, binaryPoint = fractionalBits)
+          FixedPoint.fromDouble(x, width = totalWidth.W, binaryPoint = fractionalBits.BP)
         }
       }
       val config = FFTConfig(

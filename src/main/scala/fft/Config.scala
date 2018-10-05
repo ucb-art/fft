@@ -65,12 +65,12 @@ case class FFTConfig[T <: Data](
   val bp = n/lanes
 
   // pipelining
-  val num = (log2Up(n)+1).toDouble
-  val ratio = num/(pipelineDepth%log2Up(n)+1)
-  val stages_to_pipeline = (0 until pipelineDepth%log2Up(n)).map(x => if (ratio*(x+1) < num/2 && ratio*(x+1)-0.5 == floor(ratio*(x+1))) floor(ratio*(x+1)).toInt else round(ratio*(x+1)).toInt)
-  val pipe = (0 until log2Up(n)).map(x => floor(pipelineDepth/log2Up(n)).toInt + {if (stages_to_pipeline contains (x+1)) 1 else 0})
-  val direct_pipe = pipe.drop(log2Up(bp)).foldLeft(0)(_+_)
-  val biplex_pipe = pipe.dropRight(log2Up(lanes)).foldLeft(0)(_+_)
+  val num = (log2Ceil(n)+1).toDouble
+  val ratio = num/(pipelineDepth%log2Ceil(n)+1)
+  val stages_to_pipeline = (0 until pipelineDepth%log2Ceil(n)).map(x => if (ratio*(x+1) < num/2 && ratio*(x+1)-0.5 == floor(ratio*(x+1))) floor(ratio*(x+1)).toInt else round(ratio*(x+1)).toInt)
+  val pipe = (0 until log2Ceil(n)).map(x => floor(pipelineDepth/log2Ceil(n)).toInt + {if (stages_to_pipeline contains (x+1)) 1 else 0})
+  val direct_pipe = pipe.drop(log2Ceil(bp)).foldLeft(0)(_+_)
+  val biplex_pipe = pipe.dropRight(log2Ceil(lanes)).foldLeft(0)(_+_)
   println("Pipeline registers inserted on stages: " + pipe.toArray.deep.mkString(","))
   println(s"Total biplex pipeline depth: $biplex_pipe")
   println(s"Total direct pipeline depth: $direct_pipe")
@@ -79,14 +79,14 @@ case class FFTConfig[T <: Data](
   val twiddle = (0 until n/4).map(x => Array(cos(2*Pi/n*x),-sin(2*Pi/n*x)))
 
   // indicies to the twiddle factors
-  var indices = Array.fill(log2Up(n))(0)
-  var prev = Array.fill(log2Up(n))(0)
+  var indices = Array.fill(log2Ceil(n))(0)
+  var prev = Array.fill(log2Ceil(n))(0)
   for (i <- 1 until n/2) {
-    val next = (0 until log2Up(n)).map(x => floor(i/pow(2,x)).toInt).reverse
+    val next = (0 until log2Ceil(n)).map(x => floor(i/pow(2,x)).toInt).reverse
     prev.zip(next).foreach{case(lanes,n) => {if (n != lanes) indices = indices :+ n}}
     prev = next.toArray
   }
-  indices = indices.map(x => bit_reverse(x, log2Up(n)-1))
+  indices = indices.map(x => bit_reverse(x, log2Ceil(n)-1))
 
   // take subsets of indices for split FFTs, then bit reverse to permute as needed
   var q = n
