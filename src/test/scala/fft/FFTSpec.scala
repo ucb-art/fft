@@ -2,7 +2,7 @@
 
 package fft
 
-import diplomacy.{LazyModule, LazyModuleImp}
+import freechips.rocketchip.diplomacy.{LazyModule, LazyModuleImp}
 import breeze.math.{Complex}
 import breeze.signal.{fourierTr}
 import breeze.linalg._
@@ -26,17 +26,13 @@ import org.scalatest.Tag
 import dspjunctions._
 import dspblocks._
 
-import cde._
-import junctions._
-import uncore.tilelink._
-import uncore.coherence._
-
 import craft._
 import dsptools._
+import freechips.rocketchip.config.Parameters
 
 object LocalTest extends Tag("edu.berkeley.tags.LocalTest")
 
-class FFTTester[T<:Data](val c: FFT[T]) extends DspTester(c) with HasDspPokeAs[FFT[T]] {
+class FFTTester[T<:Data](val c: FFT[T]) extends DspTester(c) {
   // this is a hack to use FFTTester outside of the normal driver methods
   override def finish = true
   def actualFinish = super.finish
@@ -66,7 +62,7 @@ object spectrumTester {
     dut.poke(io.in.valid, 1)
 
     // get delay
-    val stage_delays = (0 until log2Up(config.bp)+1).map(x => { if (x == log2Up(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
+    val stage_delays = (0 until log2Ceil(config.bp)+1).map(x => { if (x == log2Ceil(config.bp)) config.bp/2 else (config.bp/pow(2,x+1)).toInt })
     val test_length = config.bp + config.pipelineDepth + stage_delays.reduce(_+_)
 
     // create return val
@@ -77,10 +73,10 @@ object spectrumTester {
     // poke input signal
     for (i <- 0 until test_length) {
       // repeat end of signal
-      groupedSignal(min(i, groupedSignal.size-1)).zip(io.in.bits).foreach { case(sig, port) => dut.dspPoke(port, sig) }
+      groupedSignal(min(i, groupedSignal.size-1)).zip(io.in.bits).foreach { case(sig, port) => dut.poke(port, sig) }
       val valid = dut.peek(io.out.valid)
       if (!synced && (valid & !last_valid)) { synced = true; println(s"synced on cycle $i") }
-      if (synced || config.bp == 1) { io.out.bits.foreach(x => retval += dut.dspPeek(x).right.get) }
+      if (synced || config.bp == 1) { io.out.bits.foreach(x => retval += dut.peek(x)) }
       if (!synced && dut.peek(io.out.sync) && config.bp != 1) { synced = true; println(s"synced on cycle $i") }
       last_valid = valid
       dut.step(1)
@@ -114,10 +110,10 @@ object spectrumTester {
       set.zipWithIndex.foreach { case (bin, bindex) => 
         if (bp > 1) {
           val p1 = if (sindex/(bp/2) >= 1) 1 else 0
-          val new_index = bit_reverse((sindex % (bp/2)) * 2 + p1, log2Up(bp)) + bit_reverse(bindex, log2Up(n))
+          val new_index = bit_reverse((sindex % (bp/2)) * 2 + p1, log2Ceil(bp)) + bit_reverse(bindex, log2Ceil(n))
           res(new_index) = bin
         } else {
-          val new_index = bit_reverse(bindex, log2Up(n))
+          val new_index = bit_reverse(bindex, log2Ceil(n))
           res(new_index) = bin
         }
       }
@@ -150,7 +146,7 @@ object spectrumTester {
     (0 until numSamples).map(i => Complex(math.cos(2 * math.Pi * f * i), math.sin(2 * math.Pi * f * i)))
   }
 
-  def apply[T<:Data](c: () => FFT[T], config: FFTConfig, verbose: Boolean = false): Unit = {
+  def apply[T<:Data](c: () => FFT[T], config: FFTConfig[T], verbose: Boolean = false): Unit = {
 
     // get some parameters
     val fftSize = config.n
@@ -158,7 +154,7 @@ object spectrumTester {
     // bin-by-bin testing
     val m = 16 // at most 16 bins
     (0 until min(fftSize, m)).foreach{ bin =>
-      val b = if (fftSize > m) round(fftSize/m*bin) else bin
+      val b = if (fftSize > m) fftSize/m*bin else bin
       val tester = setupTester(c, verbose) 
       val tone = getTone(fftSize, b.toDouble/fftSize)
       val testResult = testSignal(tester, tone)
@@ -189,7 +185,7 @@ object spectrumTester {
         println("Expected output = ")
         println(expectedResult.toArray.deep.mkString("\n"))
       }
-      compareOutputComplex(testResult, expectedResult, 1e-2)
+      compareOutputComplex(testResult, expectedResult, 5e-2)
       teardownTester(tester)
     }
   }
@@ -226,18 +222,20 @@ class FFTSpec extends FlatSpec with Matchers {
       val fractionalBits = test(3)
       implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal {
         override def fromDouble(x: Double): FixedPoint = {
-          FixedPoint.fromDouble(x, binaryPoint = fractionalBits)
+          FixedPoint.fromDouble(x, width = totalWidth.W, binaryPoint = fractionalBits.BP)
         }
       }
-      implicit val p: Parameters = Parameters.root(
-        FFTConfigBuilder.standalone(
-          "fft",
-          FFTConfig(n = test(0), lanes = test(1), pipelineDepth = test(4), quadrature=false, real = true),
-          {() => FixedPoint(totalWidth.W, fractionalBits.BP)}
-        ).toInstance
+      val config = FFTConfig(
+        genIn = DspComplex(FixedPoint(totalWidth.W, fractionalBits.BP), FixedPoint(totalWidth.W, fractionalBits.BP)),
+        genOut = DspComplex(FixedPoint(totalWidth.W, fractionalBits.BP), FixedPoint(totalWidth.W, fractionalBits.BP)),
+        n = test(0),
+        lanes = test(1),
+        pipelineDepth = test(4),
+        quadrature = false,
       )
+      implicit val p: Parameters = null
       println(s"Testing ${test(0)}-point FFT with ${test(1)} lanes, ${test(2)} total bits, ${test(3)} fractional bits, and ${test(4)} pipeline depth")
-      spectrumTester(() => new FFT, p(FFTKey(p(DspBlockId))), false)
+      spectrumTester(() => new FFT(config), config, false)
     }
   }
 }

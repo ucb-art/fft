@@ -20,89 +20,14 @@ import org.scalatest.Tag
 import dspjunctions._
 import dspblocks._
 
-import cde._
-import junctions._
-import uncore.tilelink._
-import uncore.coherence._
-
 import craft._
 import dsptools._
 import dsptools.numbers.{Field=>_,_}
 import dsptools.numbers.implicits._
 
-import scala.collection.mutable.{Map, ArrayBuffer}
+import freechips.rocketchip.config._
 
-object FFTConfigBuilder {
-  def apply[T <: Data : Real](
-    id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config = new Config(
-    (pname, site, here) => pname match {
-      case FFTKey(_id) if _id == id => fftConfig
-      case IPXactParameters(_id) if _id == id => {
-        val parameterMap = Map[String, String]()
-
-        // Conjure up some IPXACT synthsized parameters.
-        val gk = site(GenKey(id))
-        val fftsize = fftConfig.n
-        // double these because genIn is underlying type, but input is complex
-        val totalWidthIn = genIn().getWidth 
-        val totalWidthOut = genOut.getOrElse(genIn)().getWidth
-        parameterMap ++= List(
-          ("nBands", (fftsize/gk.lanesIn).toString),
-          ("InputLanes", gk.lanesIn.toString),
-          ("InputTotalBits", totalWidthIn.toString),
-          ("OutputLanes", gk.lanesOut.toString),
-          ("OutputTotalBits", totalWidthOut.toString),
-          ("OutputPartialBitReversed", "1")
-        )
-
-        // add fractional bits if it's fixed point
-        genIn() match {
-          case fp: FixedPoint =>
-            val fractionalBits = fp.binaryPoint
-            parameterMap ++= List(
-              ("InputFractionalBits", fractionalBits.get.toString)
-            )
-          case _ =>
-        }
-        genOut.getOrElse(genIn)() match {
-          case fp: FixedPoint =>
-            val fractionalBits = fp.binaryPoint
-            parameterMap ++= List(
-              ("OutputFractionalBits", fractionalBits.get.toString)
-            )
-          case _ =>
-        }
-
-        // tech stuff, TODO
-        parameterMap ++= List(("ClockRate", "100"), ("Technology", "TSMC16nm"))
-
-        parameterMap
-      }
-      case _ => throw new CDEMatchError
-    }) ++
-  ConfigBuilder.genParams(id, fftConfig.lanes, () => DspComplex(genIn(), genIn()), genOutFunc = Some(() => DspComplex(genOut.getOrElse(genIn)(), genOut.getOrElse(genIn)())))
-  def standalone[T <: Data : Real](id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config =
-    apply(id, fftConfig, genIn, genOut) ++
-    ConfigBuilder.buildDSP(id, {implicit p: Parameters => new FFTBlock[T]})
-}
-
-class DefaultStandaloneRealFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => DspReal()))
-class DefaultStandaloneFixedPointFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => FixedPoint(16.W, 8.BP)))
-
-class CustomStandaloneFFTConfig extends Config(FFTConfigBuilder.standalone(
-  id = "fft", 
-  fftConfig = FFTConfig(
-    n = 8192,
-    lanes = 64,
-    pipelineDepth = 13,
-    real = true,
-    quadrature = true
-  ), 
-  genIn = () => FixedPoint(12.W, 8.BP), 
-  genOut = Some(() => FixedPoint(18.W, 8.BP))
-))
-
-case class FFTKey(id: String) extends Field[FFTConfig]
+import scala.collection.mutable.{ArrayBuffer, Map}
 
 /**
   * Case class for holding FFT configuration information
@@ -111,19 +36,21 @@ case class FFTKey(id: String) extends Field[FFTConfig]
   * @param n Total size of the FFT
   * @param pipelineDepth Number of pipeline registers inserted (locations automatically chosen)
   * @param lanes Number of parallel input and output lanes
-  * @param real Not currently used
   */
-case class FFTConfig(n: Int = 16, // n-point FFT
-                     pipelineDepth: Int = 0,
-                     lanes: Int = 8,
-                     real: Boolean = false, // real inputs?
-                     quadrature: Boolean = true
-                    ) {
+case class FFTConfig[T <: Data](
+  genIn: DspComplex[T],
+  genOut: DspComplex[T],
+  n: Int = 16, // n-point FFT
+  pipelineDepth: Int = 0,
+  lanes: Int = 8,
+  quadrature: Boolean = true,
+) {
   require(n >= 4, "For an n-point FFT, n must be 4 or more")
   require(isPow2(n), "For an n-point FFT, n must be a power of 2")
   require(pipelineDepth >= 0, "Cannot have negative pipelining, you silly goose.")
   //if (pipelineDepth < 0) { pipelineDepth = log2Up(n) }
 
+  val real = !quadrature
   // bit reverse a value
   def bit_reverse(in: Int, width: Int): Int = {
     var test = in
@@ -160,12 +87,12 @@ case class FFTConfig(n: Int = 16, // n-point FFT
   val bp = n/lanes_new
 
   // pipelining
-  val num = (log2Up(n)+1).toDouble
-  val ratio = num/(pipelineDepth%log2Up(n)+1)
-  val stages_to_pipeline = (0 until pipelineDepth%log2Up(n)).map(x => if (ratio*(x+1) < num/2 && ratio*(x+1)-0.5 == floor(ratio*(x+1))) floor(ratio*(x+1)).toInt else round(ratio*(x+1)).toInt)
-  val pipe = (0 until log2Up(n)).map(x => floor(pipelineDepth/log2Up(n)).toInt + {if (stages_to_pipeline contains (x+1)) 1 else 0})
-  val direct_pipe = pipe.drop(log2Up(bp)).foldLeft(0)(_+_)
-  val biplex_pipe = pipe.dropRight(log2Up(lanes_new)).foldLeft(0)(_+_)
+  val num = (log2Ceil(n)+1).toDouble
+  val ratio = num/(pipelineDepth%log2Ceil(n)+1)
+  val stages_to_pipeline = (0 until pipelineDepth%log2Ceil(n)).map(x => if (ratio*(x+1) < num/2 && ratio*(x+1)-0.5 == floor(ratio*(x+1))) floor(ratio*(x+1)).toInt else round(ratio*(x+1)).toInt)
+  val pipe = (0 until log2Ceil(n)).map(x => floor(pipelineDepth/log2Ceil(n)).toInt + {if (stages_to_pipeline contains (x+1)) 1 else 0})
+  val direct_pipe = pipe.drop(log2Ceil(bp)).foldLeft(0)(_+_)
+  val biplex_pipe = pipe.dropRight(log2Ceil(lanes_new)).foldLeft(0)(_+_)
   println("Pipeline registers inserted on stages: " + pipe.toArray.deep.mkString(","))
   println(s"Total biplex pipeline depth: $biplex_pipe")
   println(s"Total direct pipeline depth: $direct_pipe")
@@ -174,14 +101,14 @@ case class FFTConfig(n: Int = 16, // n-point FFT
   val twiddle = (0 until n/2).map(x => Array(cos(2*Pi/n*x),-sin(2*Pi/n*x)))
 
   // indicies to the twiddle factors
-  var indices = Array.fill(log2Up(n))(0)
-  var prev = Array.fill(log2Up(n))(0)
+  var indices = Array.fill(log2Ceil(n))(0)
+  var prev = Array.fill(log2Ceil(n))(0)
   for (i <- 1 until n/2) {
-    val next = (0 until log2Up(n)).map(x => floor(i/pow(2,x)).toInt).reverse
+    val next = (0 until log2Ceil(n)).map(x => floor(i/pow(2,x)).toInt).reverse
     prev.zip(next).foreach{case(px,nx) => {if (nx != px) indices = indices :+ nx}}
     prev = next.toArray
   }
-  indices = indices.map(x => bit_reverse(x, log2Up(n)-1))
+  indices = indices.map(x => bit_reverse(x, log2Ceil(n)-1))
 
   // take subsets of indices for split FFTs, then bit reverse to permute as needed
   var q = n
