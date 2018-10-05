@@ -20,87 +20,14 @@ import org.scalatest.Tag
 import dspjunctions._
 import dspblocks._
 
-import cde._
-import junctions._
-import uncore.tilelink._
-import uncore.coherence._
-
 import craft._
 import dsptools._
 import dsptools.numbers.{Field=>_,_}
 import dsptools.numbers.implicits._
 
+import freechips.rocketchip.config._
+
 import scala.collection.mutable.Map
-
-object FFTConfigBuilder {
-  def apply[T <: Data : Real](
-    id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config = new Config(
-    (pname, site, here) => pname match {
-      case FFTKey(_id) if _id == id => fftConfig
-      case IPXactParameters(_id) if _id == id => {
-        val parameterMap = Map[String, String]()
-
-        // Conjure up some IPXACT synthsized parameters.
-        val gk = site(GenKey(id))
-        val fftsize = fftConfig.n
-        // double these because genIn is underlying type, but input is complex
-        val totalWidthIn = genIn().getWidth 
-        val totalWidthOut = genOut.getOrElse(genIn)().getWidth
-        parameterMap ++= List(
-          ("nBands", (fftsize/gk.lanesIn).toString),
-          ("InputLanes", gk.lanesIn.toString),
-          ("InputTotalBits", totalWidthIn.toString),
-          ("OutputLanes", gk.lanesOut.toString),
-          ("OutputTotalBits", totalWidthOut.toString),
-          ("OutputPartialBitReversed", "1")
-        )
-
-        // add fractional bits if it's fixed point
-        genIn() match {
-          case fp: FixedPoint =>
-            val fractionalBits = fp.binaryPoint
-            parameterMap ++= List(
-              ("InputFractionalBits", fractionalBits.get.toString)
-            )
-          case _ =>
-        }
-        genOut.getOrElse(genIn)() match {
-          case fp: FixedPoint =>
-            val fractionalBits = fp.binaryPoint
-            parameterMap ++= List(
-              ("OutputFractionalBits", fractionalBits.get.toString)
-            )
-          case _ =>
-        }
-
-        // tech stuff, TODO
-        parameterMap ++= List(("ClockRate", "100"), ("Technology", "TSMC16nm"))
-
-        parameterMap
-      }
-      case _ => throw new CDEMatchError
-    }) ++
-  ConfigBuilder.genParams(id, fftConfig.lanes, () => DspComplex(genIn(), genIn()), genOutFunc = Some(() => DspComplex(genOut.getOrElse(genIn)(), genOut.getOrElse(genIn)())))
-  def standalone[T <: Data : Real](id: String, fftConfig: FFTConfig, genIn: () => T, genOut: Option[() => T] = None): Config =
-    apply(id, fftConfig, genIn, genOut) ++
-    ConfigBuilder.buildDSP(id, {implicit p: Parameters => new FFTBlock[T]})
-}
-
-class DefaultStandaloneRealFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => DspReal()))
-class DefaultStandaloneFixedPointFFTConfig extends Config(FFTConfigBuilder.standalone("fft", FFTConfig(), () => FixedPoint(16.W, 8.BP)))
-
-class CustomStandaloneFFTConfig extends Config(FFTConfigBuilder.standalone(
-  id = "fft", 
-  fftConfig = FFTConfig(
-    n = 128,
-    lanes = 4,
-    pipelineDepth = 7
-  ), 
-  genIn = () => FixedPoint(12.W, 17.BP), 
-  genOut = Some(() => FixedPoint(15.W, 14.BP))
-))
-
-case class FFTKey(id: String) extends Field[FFTConfig]
 
 /**
   * Case class for holding FFT configuration information
@@ -109,13 +36,14 @@ case class FFTKey(id: String) extends Field[FFTConfig]
   * @param n Total size of the FFT
   * @param pipelineDepth Number of pipeline registers inserted (locations automatically chosen)
   * @param lanes Number of parallel input and output lanes
-  * @param real Not currently used
   */
-case class FFTConfig(n: Int = 16, // n-point FFT
-                     pipelineDepth: Int = 0,
-                     lanes: Int = 8,
-                     real: Boolean = false // real inputs?
-                    ) {
+case class FFTConfig[T <: Data](
+  genIn: DspComplex[T],
+  genOut: DspComplex[T],
+  n: Int = 16, // n-point FFT
+  pipelineDepth: Int = 0,
+  lanes: Int = 8,
+) {
   require(n >= 4, "For an n-point FFT, n must be 4 or more")
   require(isPow2(n), "For an n-point FFT, n must be a power of 2")
   require(pipelineDepth >= 0, "Cannot have negative pipelining, you silly goose.")

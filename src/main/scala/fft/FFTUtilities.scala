@@ -6,8 +6,6 @@ import dsptools.numbers.{DspComplex, Real}
 import dsptools.numbers.implicits._
 import scala.math._
 
-import cde._
-
 // single radix-2 butterfly
 object Butterfly {
   def apply[T<:Data:Real](in: Seq[DspComplex[T]], twiddle: DspComplex[T]): Seq[DspComplex[T]] = 
@@ -23,7 +21,7 @@ object BarrelShifter {
   def apply[T<:Data](in: Vec[T], shift: UInt): Vec[T] = 
   {
     Vec((0 until in.size).map(i => {
-      val idx = Wire(UInt(width=log2Up(in.size)))
+      val idx = Wire(UInt(width=log2Up(in.size).W))
       idx := shift + UInt(i)
       in(idx)
     }))

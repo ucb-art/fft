@@ -2,32 +2,40 @@
 
 package fft
 
-import cde.Parameters
 import chisel3._
 import dsptools._
 import dsptools.numbers._
 import dspjunctions._
 import dspblocks._
+import freechips.rocketchip.amba.axi4stream._
+import freechips.rocketchip.config.Parameters
+import freechips.rocketchip.diplomacy._
+import freechips.rocketchip.regmapper._
 
-class FFTBlock[T <: Data : Real]()(implicit p: Parameters) extends DspBlock()(p) {
-  def controls = Seq()
-  def statuses = Seq()
+abstract class FFTBlock[T <: Data : Real](val config: FFTConfig[T])(implicit p: Parameters) extends TLDspBlock with TLHasCSR {
+  val streamNode = AXI4StreamIdentityNode()
 
-  lazy val module = new FFTBlockModule[T](this)
+  lazy val module = new LazyModuleImp(this) {
+    val (in, inP) = streamNode.in.head
+    val (out, outP) = streamNode.out.head
 
-  addStatus("Data_Set_End_Status")
-  addControl("Data_Set_End_Clear", 0.U)
-}
+    val module = Module(new FFT[T](config))
 
-class FFTBlockModule[T <: Data : Real](outer: DspBlock)(implicit p: Parameters)
-  extends GenDspBlockModule[T, T](outer)(p) {
-  val module = Module(new FFT[T])
-  
-  module.io.in <> unpackInput(lanesIn, genIn())
-  unpackOutput(lanesOut, genOut()) <> module.io.out
+    val dataSetEndClear = RegInit(0.U(64.W))
 
-  status("Data_Set_End_Status") := module.io.data_set_end_status
-  module.io.data_set_end_clear := control("Data_Set_End_Clear")
+    in.ready := true.B
+    module.io.in.valid := in.valid
+    module.io.in.bits := in.bits.data.asTypeOf(module.io.in.bits)
+    module.io.in.sync := in.bits.last
 
-  IPXactComponents._ipxactComponents += DspIPXact.makeDspBlockComponent(baseAddr, uuid, this.name)
+    assert(out.ready)
+    out.valid := module.io.out.valid
+    out.bits.data := module.io.out.bits.asUInt
+    out.bits.last := module.io.out.sync
+
+    regmap(
+      0x0 -> Seq(RegField.r(8, module.io.data_set_end_status)),
+      0x8 -> Seq(RegField(8, dataSetEndClear)),
+    )
+  }
 }
