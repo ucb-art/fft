@@ -20,9 +20,9 @@ object Butterfly {
 object BarrelShifter {
   def apply[T<:Data](in: Vec[T], shift: UInt): Vec[T] = 
   {
-    Vec((0 until in.size).map(i => {
-      val idx = Wire(UInt(width=log2Up(in.size).W))
-      idx := shift + UInt(i)
+    VecInit((0 until in.size).map(i => {
+      val idx = Wire(UInt(width=log2Ceil(in.size).W))
+      idx := shift + i.U
       in(idx)
     }))
   }
