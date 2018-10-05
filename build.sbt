@@ -6,7 +6,7 @@ organization := "edu.berkeley.cs"
 
 version := "1.0"
 
-scalaVersion := "2.11.7"
+scalaVersion := "2.12.7"
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),
@@ -15,14 +15,11 @@ resolvers ++= Seq(
 
 // Provide a managed dependency on X if -DXVersion="" is supplied on the command line.
 val defaultVersions = Map(
-  "dsptools" -> "1.0",
-  "rocket-dsp-utils" -> "1.0",
-  "chisel3" -> "3.1-SNAPSHOT",
-  "chisel-iotesters" -> "1.2-SNAPSHOT",
+  "rocket-dsptools" -> "1.2-SNAPSHOT",
   "tapeout" -> "0.1-SNAPSHOT"
-  )
+)
 
-libraryDependencies ++= Seq("dsptools", "rocket-dsp-utils", "chisel3", "chisel-iotesters", "tapeout").map {
+libraryDependencies ++= Seq("rocket-dsptools").map {
   dep: String => "edu.berkeley.cs" %% dep % sys.props.getOrElse(dep + "Version", defaultVersions(dep)) }
 
 libraryDependencies += "org.spire-math" %% "spire" % "0.11.0"
@@ -30,8 +27,8 @@ libraryDependencies += "org.spire-math" %% "spire" % "0.11.0"
 libraryDependencies += "org.scalanlp" %% "breeze" % "0.12"
 
 libraryDependencies ++= Seq(
-  "org.scalatest" %% "scalatest" % "2.2.5",
-  "org.scalacheck" %% "scalacheck" % "1.12.4")
+  "org.scalatest" %% "scalatest" % "3.0.5",
+  "org.scalacheck" %% "scalacheck" % "1.14.0")
 
 lazy val TravisTest = config("travis") extend(Test)
 
@@ -40,9 +37,3 @@ lazy val fft = (project in file(".")).
   settings(inConfig(TravisTest)(Defaults.testTasks): _*)
 
 testOptions in TravisTest += Tests.Argument(TestFrameworks.ScalaTest, "-l", "edu.berkeley.tags.LocalTest", "-eF")
-
-ghpages.settings
-
-git.remoteRepo := "git@github.com:ucb-art/fft.git"
-
-site.includeScaladoc()

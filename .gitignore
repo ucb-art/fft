@@ -133,6 +133,7 @@ local.properties
 # Simple Build Tool
 # http://www.scala-sbt.org/release/docs/Getting-Started/Directories.html#configuring-version-control
 
+project/build.properties
 target/
 lib_managed/
 src_managed/
