@@ -11,9 +11,21 @@ import freechips.rocketchip.amba.axi4stream._
 import freechips.rocketchip.config.Parameters
 import freechips.rocketchip.diplomacy._
 import freechips.rocketchip.regmapper._
+import freechips.rocketchip.tilelink._
 
-abstract class FFTBlock[T <: Data : Real](val config: FFTConfig[T])(implicit p: Parameters) extends TLDspBlock with TLHasCSR {
+class FFTBlock[T <: Data : Real](val config: FFTConfig[T])(implicit p: Parameters) extends TLDspBlock with TLHasCSR {
   val streamNode = AXI4StreamIdentityNode()
+  def csrAddress = AddressSet(0x2000, 0x0fff)
+  def beatBytes = 8
+  def devname = "tlfft"
+  def devcompat = Seq("ucb-art", "fft")
+  val device = new SimpleDevice(devname, devcompat) {
+    override def describe(resources: ResourceBindings): Description = {
+      val Description(name, mapping) = super.describe(resources)
+      Description(name, mapping)
+    }
+  }
+  override val mem = Some(TLRegisterNode(address = Seq(csrAddress), device = device, beatBytes = beatBytes))
 
   lazy val module = new LazyModuleImp(this) {
     val (in, inP) = streamNode.in.head
@@ -22,6 +34,7 @@ abstract class FFTBlock[T <: Data : Real](val config: FFTConfig[T])(implicit p: 
     val module = Module(new FFT[T](config))
 
     val dataSetEndClear = RegInit(0.U(64.W))
+    module.io.data_set_end_clear := dataSetEndClear
 
     in.ready := true.B
     module.io.in.valid := in.valid
