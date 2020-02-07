@@ -19,10 +19,7 @@ Clone the repository and update the depenedencies:
 
 ```
 git clone git@github.com:ucb-art/fft.git
-git submodule update --init
-cd dsp-framework
-./update.bash no_hwacha
-cd ..
+./setup.sh
 ```
 
 See the [dsp-framework README](https://github.com/ucb-art/dsp-framework/blob/master/README.md) for more details on this infrastructure.
