@@ -30,7 +30,7 @@ Build the dependencies by typing `make libs`.
 The build flow generates FIRRTL, then generates Verilog, then runs the TSMC memory compiler to generate memories.
 Memories are black boxes in the Verilog by default.
 IP-Xact is created with the FIRRTL.
-The build targets for each of these are firrtl, verilog, and mems, respectively.
+The build targets for each of these are `firrtl`, `verilog`, and `mems`, respectively.
 Depedencies are handled automatically, so to build the Verilog and memories, just type `make mems`.
 Results are placed in a `generated-src` directory.
 
