@@ -20,9 +20,8 @@ env:
     PATH=$PATH:$VERILATOR_ROOT/bin:$TRAVIS_BUILD_DIR/utils/bin
 
 script:
-  - git submodule update --init dsp-framework
   - export ROCKETCHIP_ADDONS=
-  - cd dsp-framework; ./update.bash no_hwacha; cd ..; make libs
-  - make verilog
+  - ./setup.sh
+# - make verilog
   - make travis
 
