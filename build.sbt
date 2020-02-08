@@ -6,7 +6,7 @@ organization := "edu.berkeley.cs"
 
 version := "1.0"
 
-scalaVersion := "2.12.7"
+scalaVersion := "2.12.6"
 
 resolvers ++= Seq(
   Resolver.sonatypeRepo("snapshots"),
@@ -22,9 +22,9 @@ val defaultVersions = Map(
 libraryDependencies ++= Seq("rocket-dsptools").map {
   dep: String => "edu.berkeley.cs" %% dep % sys.props.getOrElse(dep + "Version", defaultVersions(dep)) }
 
-libraryDependencies += "org.spire-math" %% "spire" % "0.11.0"
+libraryDependencies += "org.spire-math" %% "spire" % "0.13.0"
 
-libraryDependencies += "org.scalanlp" %% "breeze" % "0.12"
+libraryDependencies += "org.scalanlp" %% "breeze" % "0.13"
 
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "3.0.5",
