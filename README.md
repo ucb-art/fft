@@ -22,6 +22,8 @@ git clone git@github.com:ucb-art/fft.git
 ./setup.sh
 ```
 
+Note: if you encounter errors like `[NOT FOUND  ] org.slf4j#slf4j-api;1.7.25!slf4j-api.jar (0ms)`, try clearing your `~/.sbt` folder (e.g. `~/.sbt/preloaded`).
+
 See the [dsp-framework README](https://github.com/ucb-art/dsp-framework/blob/master/README.md) for more details on this infrastructure.
 Build the dependencies by typing `make libs`.
 
