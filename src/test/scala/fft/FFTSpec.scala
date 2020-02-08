@@ -208,33 +208,38 @@ object spectrumTester {
 class FFTSpec extends FlatSpec with Matchers {
   behavior of "FFT"
 
-  it should "Fourier transform" in {
-
-    val tests = Seq(
-      // (FFT points, lanes, total width, fractional bits, pipeline depth)
-      Seq(8,   8,  35, 19, 0),
-      Seq(128, 16, 25, 16, 17)
-    )
-
-    for (test <- tests) {
-      val totalWidth = test(2)
-      val fractionalBits = test(3)
-      implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal {
-        override def fromDouble(x: Double): FixedPoint = {
-          FixedPoint.fromDouble(x, width = totalWidth.W, binaryPoint = fractionalBits.BP)
-        }
+  def runTest(test: Seq[Int]): Unit = {
+    val totalWidth = test(2)
+    val fractionalBits = test(3)
+    implicit object FixedTypeclass extends dsptools.numbers.FixedPointReal {
+      override def fromDouble(x: Double): FixedPoint = {
+        FixedPoint.fromDouble(x, width = totalWidth.W, binaryPoint = fractionalBits.BP)
       }
-      val config = FFTConfig(
-        genIn = DspComplex(FixedPoint(totalWidth.W, fractionalBits.BP), FixedPoint(totalWidth.W, fractionalBits.BP)),
-        genOut = DspComplex(FixedPoint(totalWidth.W, fractionalBits.BP), FixedPoint(totalWidth.W, fractionalBits.BP)),
-        n = test(0),
-        lanes = test(1),
-        pipelineDepth = test(4)
-      )
-      implicit val p: Parameters = null
-      println(s"Testing ${test(0)}-point FFT with ${test(1)} lanes, ${test(2)} total bits, ${test(3)} fractional bits, and ${test(4)} pipeline depth")
-      spectrumTester(() => new FFT(config), config, false)
     }
+    val config = FFTConfig(
+      genIn = DspComplex(FixedPoint(totalWidth.W, fractionalBits.BP), FixedPoint(totalWidth.W, fractionalBits.BP)),
+      genOut = DspComplex(FixedPoint(totalWidth.W, fractionalBits.BP), FixedPoint(totalWidth.W, fractionalBits.BP)),
+      n = test(0),
+      lanes = test(1),
+      pipelineDepth = test(4)
+    )
+    implicit val p: Parameters = null
+    println(s"Testing ${test(0)}-point FFT with ${test(1)} lanes, ${test(2)} total bits, ${test(3)} fractional bits, and ${test(4)} pipeline depth")
+    spectrumTester(() => new FFT(config), config, false)
+  }
+
+  val tests = Seq(
+    // (FFT points, lanes, total width, fractional bits, pipeline depth)
+    Seq(8,   8,  35, 19, 0),
+    Seq(128, 16, 25, 16, 17)
+  )
+
+  it should "Fourier transform 0" in {
+    runTest(tests(0))
+  }
+
+  it should "Fourier transform 1" in {
+    runTest(tests(1))
   }
 }
 
