@@ -6,7 +6,6 @@ sudo: false
 install:
   # Install Verilator (if not found in cache)
   # Get it from firrtl's install script
-  - wget "https://raw.githubusercontent.com/ucb-bar/firrtl/master/.install_verilator.sh"
   - bash .install_verilator.sh
 
 cache:
