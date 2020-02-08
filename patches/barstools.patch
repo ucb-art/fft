@@ -1,0 +1,38 @@
+diff --git a/build.sbt b/build.sbt
+index f18110c..b584389 100644
+--- a/build.sbt
++++ b/build.sbt
+@@ -10,7 +10,7 @@ val defaultVersions = Map(
+ lazy val commonSettings = Seq(
+   organization := "edu.berkeley.cs",
+   version := "0.1-SNAPSHOT",
+-  scalaVersion := "2.11.8",
++  scalaVersion := "2.12.6",
+   scalacOptions := Seq("-deprecation", "-feature", "-language:reflectiveCalls"),
+   libraryDependencies ++= commonDependencies,
+   libraryDependencies ++= Seq("chisel3","chisel-iotesters").map {
+@@ -24,7 +24,7 @@ lazy val commonSettings = Seq(
+ 
+ disablePlugins(sbtassembly.AssemblyPlugin)
+ 
+-lazy val mdf = (project in file("mdf/scalalib"))
++lazy val mdf = (project in file("mdf/scalalib")).settings(commonSettings)
+ lazy val macros = (project in file("macros"))
+   .dependsOn(mdf)
+   .settings(commonSettings)
+diff --git a/project/assembly.sbt b/project/assembly.sbt
+index 8956d33..89b6984 100644
+--- a/project/assembly.sbt
++++ b/project/assembly.sbt
+@@ -1,2 +1,2 @@
+ addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.14.5")
+-addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.8.2")
++//addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.8.2")
+diff --git a/project/build.properties b/project/build.properties
+index 7d789d4..31334bb 100644
+--- a/project/build.properties
++++ b/project/build.properties
+@@ -1 +1 @@
+-sbt.version=0.13.12
+\ No newline at end of file
++sbt.version=1.1.1

@@ -1,0 +1,13 @@
+diff --git a/scalalib/build.sbt b/scalalib/build.sbt
+index 5102f03..6d69049 100644
+--- a/scalalib/build.sbt
++++ b/scalalib/build.sbt
+@@ -1,7 +1,7 @@
+ organization := "edu.berkeley.cs"
+ name := "mdf"
+ version := "0.1-SNAPSHOT"
+-scalaVersion := "2.11.8"
++scalaVersion := "2.12.6"
+ scalacOptions := Seq("-deprecation", "-feature", "-language:reflectiveCalls")
+ libraryDependencies ++= Seq(
+   "com.typesafe.play" %% "play-json" % "2.6.2",
