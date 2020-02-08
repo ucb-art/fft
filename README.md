@@ -29,7 +29,10 @@ Build the dependencies by typing `make libs`.
 
 ## Building
 
+Try running `make test` to do a sanity check of the repo.
+
 To generate Verilog, try `make verilog`.
+**NOTE: `make verilog` is broken out of the box as this project doesn't appear to ship with a default `Generator`.**
 
 The build flow generates FIRRTL, then generates Verilog, then runs the TSMC memory compiler to generate memories.
 Memories are black boxes in the Verilog by default.
